@@ -36,7 +36,7 @@ set(FETCHCONTENT_UPDATES_DISCONNECTED ON)  # 重用已下载依赖
 FetchContent_Declare(
   ftxui
   GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git
-  GIT_TAG        v6.1.8
+  GIT_TAG        v6.1.9
   GIT_PROGRESS ON
   GIT_SHALLOW    TRUE
 )
@@ -50,24 +50,30 @@ FetchContent_Declare(
   GIT_SHALLOW    TRUE
 )
 
-# Catch2 (单元测试框架)
 FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.5.2
-  GIT_PROGRESS ON
-  GIT_SHALLOW    TRUE
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        v1.15.0
 )
 
 # 并行获取所有依赖
-FetchContent_MakeAvailable(ftxui fmt Catch2)
+FetchContent_MakeAvailable(ftxui fmt googletest)
+# 禁用 FTXUI 的 pedantic 错误（针对 GCC/Clang）
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  if(TARGET dom)
+    target_compile_options(dom PRIVATE -Wno-error=pedantic)
+  endif()
+  if(TARGET screen)
+    target_compile_options(screen PRIVATE -Wno-error=pedantic)
+  endif()
+endif()
 
 #--------------------- 主程序目标配置 ----------------------
 add_executable(bin-reader
   src/main.cpp
-  src/model/BinaryEditor.cpp
-  src/controller/EditorController.cpp
-  src/view/EditorView.cpp
+  src/BinaryEditor.cpp
+  src/EditorController.cpp
+  src/EditorView.cpp
 )
 
 target_include_directories(bin-reader PRIVATE
@@ -87,7 +93,7 @@ if(BUILD_TESTING)
 
   add_executable(bin-reader-tests
     tests/test_main.cpp
-    src/model/BinaryEditor.cpp  # 包含实现文件
+    src/BinaryEditor.cpp  # 包含实现文件
   )
 
   target_include_directories(bin-reader-tests PRIVATE
@@ -95,12 +101,12 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(bin-reader-tests PRIVATE
-    Catch2::Catch2WithMain
-    fmt::fmt  # 测试可能需要格式化输出
+    GTest::gtest_main
+    pthread
   )
 
+  include(GoogleTest)
+  gtest_discover_tests(bin-reader-tests)
   # 自动发现测试用例
   include(CTest)
-  include(Catch)
-  catch_discover_tests(bin-reader-tests)
 endif()

@@ -26,6 +26,7 @@ public:
 
 private:
     std::fstream file;
+    std::string filename;
     size_t current_offset;
     size_t file_size;
     std::stack<std::vector<std::pair<size_t, std::vector<char>>>> write_history;

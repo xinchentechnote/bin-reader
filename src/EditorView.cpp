@@ -1,26 +1,19 @@
-#include "EditorView.hpp"
 #include <ftxui/component/component.hpp>
-
+#include <ftxui/dom/elements.hpp>
+#include <BinaryEditor.hpp>
 using namespace ftxui;
 
-Component EditorView(BinaryEditor& model) {
-    return Renderer([&] {
-        return vbox({
-            text("Binary File Editor") | bold | center,
-            separator(),
-            hbox({
-                text("Offset: " + std::to_string(model.offset())),
-                text(" | File Size: " + std::to_string(model.size()))
-            }),
-            separator(),
-            // 数据展示区域
-            vbox({
-                text("Data Preview:"),
-                // 动态数据渲染...
-            }) | flex,
-            separator(),
-            // 命令输入框
-            input("Enter command (e.g. r i32 4):", "")
-        });
+Component EditorView([[maybe_unused]] BinaryEditor& editor) {
+  // 创建输入组件
+  auto input = Input("Enter command (e.g. r i32 4):", "");
+
+  return Renderer(input, [=] {
+    return vbox({
+      text("Binary File Editor") | bold | center,
+      separator(),
+      input->Render(),  // 正确渲染组件
+      separator(),
+      text("Output Area:")
     });
+  });
 }
