@@ -1,0 +1,32 @@
+name: bin-reader CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y cmake g++ git
+    - name: Force HTTPS for GitHub URLs
+      run: 'git config --global url."https://github.com/".insteadOf git@github.com:'
+
+    - name: Configure with CMake
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Run tests
+      run: cd build && ctest
