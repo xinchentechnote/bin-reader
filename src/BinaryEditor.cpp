@@ -50,7 +50,7 @@ std::vector<T> BinaryEditor::read(size_t count)
 template <typename T>
 T BinaryEditor::peek()
 {
-    if (m_read_index + sizeof(T)> m_file_size)
+    if (m_read_index + sizeof(T) > m_file_size)
     {
         throw std::out_of_range("Read operation exceeds file size");
     }
@@ -98,6 +98,43 @@ size_t BinaryEditor::size() const
     return m_file_size;
 }
 
+std::string BinaryEditor::read_fixed_string(size_t n)
+{
+    if (m_read_index + n > m_file_size)
+    {
+        throw std::out_of_range("Read operation exceeds file size");
+    }
+
+    // 记录读取历史
+    read_history.push({static_cast<uint32_t>(m_read_index), n});
+
+    // 读取原始字节
+    file.seekg(m_read_index);
+    std::vector<char> buffer(n);
+    file.read(buffer.data(), n);
+    m_read_index += n;
+
+    // 转换为字符串（UTF-8）
+    return std::string(buffer.data(), n);
+}
+
+std::string BinaryEditor::peek_fixed_string(size_t n)
+{
+    if (m_read_index + n > m_file_size)
+    {
+        throw std::out_of_range("Peek operation exceeds file size");
+    }
+
+    auto original_pos = file.tellg();
+    file.seekg(m_read_index);
+
+    std::vector<char> buffer(n);
+    file.read(buffer.data(), n);
+
+    file.seekg(original_pos);
+    return std::string(buffer.data(), n);
+}
+
 template std::vector<uint8_t> BinaryEditor::read<uint8_t>(size_t);
 template std::vector<uint16_t> BinaryEditor::read<uint16_t>(size_t);
 template std::vector<uint32_t> BinaryEditor::read<uint32_t>(size_t);
@@ -111,8 +148,6 @@ template std::vector<int64_t> BinaryEditor::read<int64_t>(size_t);
 template std::vector<float> BinaryEditor::read<float>(size_t);
 template std::vector<double> BinaryEditor::read<double>(size_t);
 
-
-
 template uint8_t BinaryEditor::peek<uint8_t>();
 template uint16_t BinaryEditor::peek<uint16_t>();
 template uint32_t BinaryEditor::peek<uint32_t>();
@@ -125,3 +160,33 @@ template int64_t BinaryEditor::peek<int64_t>();
 
 template float BinaryEditor::peek<float>();
 template double BinaryEditor::peek<double>();
+
+template <typename LengthType>
+std::string BinaryEditor::read_length_prefixed_string() {
+    // 记录整体操作开始位置
+    const size_t start_index = m_read_index;
+
+    try {
+        // 读取长度前缀
+        LengthType len = read<LengthType>()[0];
+        
+        // 读取字符串内容
+        std::string str = read_fixed_string(len);
+
+        // 用整体操作替换两个独立记录
+        read_history.pop();  // 移除固定字符串记录
+        read_history.pop();  // 移除长度前缀记录
+        read_history.push({static_cast<uint32_t>(start_index), sizeof(LengthType) + len});
+
+        return str;
+    } catch (...) {
+        // 发生异常时恢复读取索引
+        m_read_index = start_index;
+        throw;
+    }
+}
+
+// 显式实例化常用长度类型
+template std::string BinaryEditor::read_length_prefixed_string<uint8_t>();
+template std::string BinaryEditor::read_length_prefixed_string<uint16_t>();
+template std::string BinaryEditor::read_length_prefixed_string<uint32_t>();

@@ -93,7 +93,8 @@ if(BUILD_TESTING)
   enable_testing()
 
   add_executable(bin-reader-tests
-    tests/test_main.cpp
+    tests/test_binary_editor_read_base_type.cpp
+    tests/test_binary_editor_read_string.cpp
     src/BinaryEditor.cpp  # 包含实现文件
   )
 
