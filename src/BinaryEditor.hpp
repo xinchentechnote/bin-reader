@@ -4,11 +4,24 @@
 #include <stack>
 #include <cstdint>
 #include <stdexcept>
+#include <any>
 
 struct Record
 {
-    u_int32_t index;
-    size_t data_size;
+    std::string type_name; // 类型名称
+    std::any data;         // 存储任何类型的数据
+    size_t index;          // 读取起始位置
+    size_t size_bytes;     // 占用字节数
+
+    Record(size_t idx)
+        : index(idx) {}
+    // 示例："uint32_t[3] @ 0x100 (12 bytes)"
+    std::string description() const
+    {
+        return type_name + " @ 0x" +
+               std::to_string(index) + " (" +
+               std::to_string(size_bytes) + "B)";
+    }
 };
 
 class BinaryEditor

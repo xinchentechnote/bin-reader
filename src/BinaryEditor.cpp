@@ -2,6 +2,22 @@
 #include <fstream>
 #include <stdexcept>
 
+template <typename T> struct TypeName { static const char* value; };
+
+// 特化基础类型
+template<> const char* TypeName<uint8_t>::value = "uint8_t";
+template<> const char* TypeName<uint16_t>::value = "uint16_t";
+template<> const char* TypeName<uint32_t>::value = "uint32_t";
+template<> const char* TypeName<uint64_t>::value = "uint64_t";
+template<> const char* TypeName<int8_t>::value = "int8_t";
+template<> const char* TypeName<int16_t>::value = "int16_t";
+template<> const char* TypeName<int32_t>::value = "int32_t";
+template<> const char* TypeName<int64_t>::value = "int64_t";
+template<> const char* TypeName<float>::value = "float";
+template<> const char* TypeName<double>::value = "double";
+template<> const char* TypeName<bool>::value = "bool";
+template<> const char* TypeName<std::string>::value = "string";
+
 BinaryEditor::BinaryEditor(const std::string &filename)
     : filename(filename), m_read_index(0), m_file_size(0)
 {
@@ -37,13 +53,19 @@ std::vector<T> BinaryEditor::read(size_t count)
         throw std::out_of_range("Read operation exceeds file size");
     }
 
-    // 记录读取历史
-    read_history.push({static_cast<uint32_t>(m_read_index), sizeof(T) * count});
     // 执行读取
     file.seekg(m_read_index);
     std::vector<T> data(count);
     file.read(reinterpret_cast<char *>(data.data()), sizeof(T) * count);
+
+    Record record(m_read_index);
+    record.type_name = TypeName<T>::value;
+    if (count > 1) record.type_name += "[" + std::to_string(count) + "]";
+    record.data = data;
+    record.size_bytes = sizeof(T) * count;
+    read_history.push(record);
     m_read_index += sizeof(T) * count;
+
     return data;
 }
 
@@ -105,17 +127,23 @@ std::string BinaryEditor::read_fixed_string(size_t n)
         throw std::out_of_range("Read operation exceeds file size");
     }
 
-    // 记录读取历史
-    read_history.push({static_cast<uint32_t>(m_read_index), n});
-
+    Record record(m_read_index);
     // 读取原始字节
     file.seekg(m_read_index);
     std::vector<char> buffer(n);
     file.read(buffer.data(), n);
     m_read_index += n;
-
+    
     // 转换为字符串（UTF-8）
-    return std::string(buffer.data(), n);
+    std::string data = std::string(buffer.data(), n);
+    // 记录读取历史
+    record.type_name = TypeName<std::string>::value;
+    record.type_name += "[" + std::to_string(n) + "]";
+    record.data = data;
+   
+    record.size_bytes = n;
+    read_history.push(record);
+    return data;
 }
 
 std::string BinaryEditor::peek_fixed_string(size_t n)
@@ -176,7 +204,13 @@ std::string BinaryEditor::read_length_prefixed_string() {
         // 用整体操作替换两个独立记录
         read_history.pop();  // 移除固定字符串记录
         read_history.pop();  // 移除长度前缀记录
-        read_history.push({static_cast<uint32_t>(start_index), sizeof(LengthType) + len});
+
+        Record record(start_index);
+        record.type_name = TypeName<LengthType>::value;
+        record.type_name += "@string";
+        record.data = str;
+        record.size_bytes = sizeof(LengthType) + len;
+        read_history.push(record);
 
         return str;
     } catch (...) {
