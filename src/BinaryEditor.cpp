@@ -2,93 +2,88 @@
 #include <fstream>
 #include <stdexcept>
 
-BinaryEditor::BinaryEditor(const std::string& filename) : filename(filename),current_offset(0) {
+BinaryEditor::BinaryEditor(const std::string &filename)
+    : filename(filename), m_read_index(0), m_file_size(0)
+{
     file.open(filename, std::ios::binary | std::ios::in | std::ios::out);
-    if (!file.is_open()) {
+    if (!file.is_open())
+    {
         throw std::runtime_error("Failed to open file: " + filename);
     }
     load_file_size();
 }
 
-BinaryEditor::~BinaryEditor() {
-    if (file.is_open()) {
+BinaryEditor::~BinaryEditor()
+{
+    if (file.is_open())
+    {
         file.close();
     }
 }
 
-void BinaryEditor::load_file_size() {
+void BinaryEditor::load_file_size()
+{
     file.seekg(0, std::ios::end);
-    file_size = file.tellg();
-    file.seekg(current_offset);
+    m_file_size = file.tellg();
+    file.seekg(m_read_index);
 }
 
-template<typename T>
-std::vector<T> BinaryEditor::read(size_t count) {
-    if (current_offset + sizeof(T) * count > file_size) {
+//------------------ 读取操作 ------------------
+template <typename T>
+std::vector<T> BinaryEditor::read(size_t count)
+{
+    if (m_read_index + sizeof(T) * count > m_file_size)
+    {
         throw std::out_of_range("Read operation exceeds file size");
     }
 
+    // 记录读取历史
+    read_history.push({static_cast<uint32_t>(m_read_index), sizeof(T) * count});
+    // 执行读取
+    file.seekg(m_read_index);
     std::vector<T> data(count);
-    file.read(reinterpret_cast<char*>(data.data()), sizeof(T) * count);
-    current_offset += sizeof(T) * count;
+    file.read(reinterpret_cast<char *>(data.data()), sizeof(T) * count);
+    m_read_index += sizeof(T) * count;
     return data;
 }
 
-template<typename T>
-void BinaryEditor::write(const std::vector<T>& values) {
-    if (values.empty()) return;
-
-    const size_t write_size = sizeof(T) * values.size();
-    std::vector<char> original_data(write_size);
-
-    // 备份当前数据
-    const size_t backup_pos = current_offset;
-    file.seekg(backup_pos);
-    file.read(original_data.data(), write_size);
-    write_history.push({{backup_pos, original_data}});  // 记录备份位置和数据
-
-    // 写入新数据
-    file.seekp(backup_pos);
-    file.write(reinterpret_cast<const char*>(values.data()), write_size);
-    file.flush();
-
-    current_offset = backup_pos + write_size;  // 更新偏移量
-    load_file_size();
+//------------------ 撤销操作 ------------------
+void BinaryEditor::undo()
+{
+    undor();
 }
 
-void BinaryEditor::undo() {
-    if (write_history.empty()) return;
+void BinaryEditor::undor()
+{
+    if (read_history.empty())
+        return;
 
-    auto [pos, data] = write_history.top().back();
-    
-    // 恢复原始数据
-    file.seekp(pos);
-    file.write(data.data(), data.size());
-    file.flush();
-
-    // 关闭并重新打开文件以正确截断
-    file.close();
-    file.open(filename, std::ios::binary | std::ios::in | std::ios::out);
-
-    // 重置偏移量
-    current_offset = pos;
-    file.seekg(current_offset);
-
-    write_history.pop();
-    load_file_size();  // 重新加载文件大小
+    // 撤销读取：回退读取索引
+    Record record = read_history.top();
+    m_read_index = record.index;
+    read_history.pop();
 }
 
-void BinaryEditor::set_offset(size_t new_offset) {
-    if (new_offset > file_size) {
-        throw std::out_of_range("Offset exceeds file size");
-    }
-    current_offset = new_offset;
-    file.seekg(new_offset);
+//------------------ 索引管理 ------------------
+size_t BinaryEditor::read_index() const
+{
+    return m_read_index;
 }
 
-// 显式实例化模板
+void BinaryEditor::set_read_index(uint32_t index)
+{
+    if (index > m_file_size)
+        throw std::out_of_range("Invalid read index");
+    m_read_index = index;
+    file.seekg(m_read_index);
+}
+
+size_t BinaryEditor::size() const
+{
+    return m_file_size;
+}
+
+//------------------ 显式模板实例化 ------------------
 template std::vector<uint32_t> BinaryEditor::read<uint32_t>(size_t);
-template void BinaryEditor::write<uint32_t>(const std::vector<uint32_t>&);
 template std::vector<int32_t> BinaryEditor::read<int32_t>(size_t);
-template void BinaryEditor::write<int32_t>(const std::vector<int32_t>&);
 template std::vector<uint8_t> BinaryEditor::read<uint8_t>(size_t);

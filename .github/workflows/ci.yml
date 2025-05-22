@@ -23,7 +23,7 @@ jobs:
       run: 'git config --global url."https://github.com/".insteadOf git@github.com:'
 
     - name: Configure with CMake
-      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release --log-level=VERBOSE -DBUILD_TESTING=ON
 
     - name: Build
       run: cmake --build build
