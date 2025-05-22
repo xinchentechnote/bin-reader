@@ -49,7 +49,7 @@ TEST_F(BinaryEditorTest, UndoReadOperation)
     }
 
     BinaryEditor editor(filename);
-    
+    EXPECT_EQ(editor.peek<uint32_t>(), 0x12345678);
     // First read - should be 0x78
     auto data = editor.read<uint8_t>();
     EXPECT_EQ(data[0], 0x78);
@@ -59,6 +59,9 @@ TEST_F(BinaryEditorTest, UndoReadOperation)
     EXPECT_EQ(data[0], 0x56);
     
     // Third read - should be 0x34
+    EXPECT_EQ(editor.peek<uint8_t>(), 0x34);
+    EXPECT_EQ(editor.peek<uint8_t>(), 0x34);
+    EXPECT_EQ(editor.peek<uint8_t>(), 0x34);
     data = editor.read<uint8_t>();
     EXPECT_EQ(data[0], 0x34);
     

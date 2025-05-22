@@ -7,7 +7,7 @@
 ## 功能特性
 
 - **交互式 TUI**: 使用 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 构建直观的命令行界面。
-- **基本数据类型**: i8 u8 i16 u16 i32 u32 i64 u64 i128 u128 f32 f64 bool
+- **基本数据类型**: i8 u8 i16 u16 i32 u32 i64 u64 f32 f64
 - **字符串类型**: char[n] u8@string@utf8 
 - **多数据类型解析**:
   - `r i32 [N]`: 读取 `int32` 类型（默认 `N=1`）。

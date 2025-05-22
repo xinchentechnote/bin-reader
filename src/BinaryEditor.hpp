@@ -19,6 +19,8 @@ public:
     template<typename T>
     std::vector<T> read(size_t count = 1);
     template<typename T>
+    T peek();
+    template<typename T>
     void write(const std::vector<T>& values);
     
     // 撤销操作
