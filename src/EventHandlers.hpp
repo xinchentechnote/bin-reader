@@ -37,6 +37,16 @@ namespace EventHandlers
                 ++state.cursor_pos;
                 return true;
             }
+            if (event == Event::ArrowUp && state.cursor_pos >= state.bytes_per_line)
+            {
+                state.cursor_pos -= state.bytes_per_line;
+                return true;
+            }
+            if (event == Event::ArrowDown && state.cursor_pos + state.bytes_per_line < state.data.size() - 1)
+            {
+                state.cursor_pos += state.bytes_per_line;
+                return true;
+            }
             if (event == Event::Character('q') ||
                 event == Event::Escape)
             {
