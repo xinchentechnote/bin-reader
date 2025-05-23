@@ -51,7 +51,7 @@ namespace UIComponents
                 }));
             }
 
-            return vbox(lines); });
+            return vbox(lines); }) | border;
     }
 
     inline Component StatusBar(AppState &state)
@@ -64,5 +64,52 @@ namespace UIComponents
                                   bgcolor(Color::DarkGreen),
                               text(fmt::format(" {} ", state.status_msg)) | bgcolor(Color::DarkRed) | flex,
                           }); });
+    }
+
+    inline Component DataPreviewBar(AppState& state) {
+        return Renderer([&] {
+            size_t pos = state.cursor_pos;
+            auto endian_str = state.is_little_endian ? "LE" : "BE";
+            return vbox({
+                       hbox({text("Endian:") | bold | color(Color::GrayDark),
+                             text(endian_str)}),
+                       hbox({text(" i8: ") | color(Color::Green) | flex_shrink,
+                             text(state.read_value<int8_t>(pos)) | flex_grow}),
+                       hbox({text(" u8: ") | color(Color::Cyan) | flex_shrink,
+                             text(state.read_value<uint8_t>(pos)) | flex_grow}),
+                       hbox({text("i16: ") | color(Color::Yellow) | flex_shrink,
+                             text(state.read_value<int16_t>(pos)) | flex_grow}),
+                       hbox({text("u16: ") | color(Color::Magenta) | flex_shrink,
+                             text(state.read_value<uint16_t>(pos)) | flex_grow}),
+                       hbox({text("i32: ") | color(Color::Red) | flex_shrink,
+                             text(state.read_value<int32_t>(pos)) | flex_grow}),
+                       hbox({text("u32: ") | color(Color::Blue) | flex_shrink,
+                             text(state.read_value<uint32_t>(pos)) | flex_grow}),
+                       hbox({text("i64: ") | color(Color::Red) | flex_shrink,
+                             text(state.read_value<int64_t>(pos)) | flex_grow}),
+                       hbox({text("u64: ") | color(Color::Blue) | flex_shrink,
+                             text(state.read_value<uint64_t>(pos)) | flex_grow}),
+                       hbox({text("f32: ") | color(Color::White) | flex_shrink,
+                             text(state.read_value<float>(pos)) | flex_grow}),
+                       hbox({text("f64: ") | color(Color::White) | flex_shrink,
+                             text(state.read_value<double>(pos)) | flex_grow}),
+                   }) |
+                   border | size(WIDTH, EQUAL, 30); // 固定右侧宽度
+        });
+    }
+
+    inline Component CommandLine(std::string& command_input) {
+        ftxui::InputOption options;
+        options.placeholder = "Command (set be/le/pos <num>)";
+        options.password = false;
+        
+        auto input_component = Input(&command_input, options);
+
+        return Renderer(input_component, [&] {
+            return hbox({
+                text("> ") | color(Color::Green),
+                input_component->Render() 
+            });
+        });
     }
 }

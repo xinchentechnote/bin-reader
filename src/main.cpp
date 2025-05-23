@@ -14,22 +14,33 @@ int main()
 {
     auto screen = ScreenInteractive::Fullscreen();
     AppState state;
-
+    std::string cmd;
     // 初始化测试数据
     state.data.resize(512);
     for (size_t i = 0; i < state.data.size(); ++i)
     {
         state.data[i] = i % 256;
     }
-
+    auto commandLine = UIComponents::CommandLine(cmd);
     // 构建UI
     auto layout = Container::Vertical({
         UIComponents::StatusBar(state),
-        UIComponents::HexView(state),
+        Container::Horizontal({
+            UIComponents::HexView(state),
+            UIComponents::DataPreviewBar(state)
+        }),
+       commandLine
     });
 
     // 事件处理
-    auto component = CatchEvent(layout, EventHandlers::HandleNavigation(state, screen));
+    auto component = ftxui::CatchEvent(layout, [&](const ftxui::Event& event) {
+        // 先处理命令输入
+        if (EventHandlers::HandleCommands(state, cmd)(event)) {
+            return true;
+        }
+        // 再处理导航事件
+        return EventHandlers::HandleNavigation(state, screen)(event);
+    });
 
     screen.Loop(component);
     return 0;
