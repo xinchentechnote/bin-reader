@@ -5,14 +5,14 @@
 template <typename T> struct TypeName { static const char* value; };
 
 // 特化基础类型
-template<> const char* TypeName<uint8_t>::value = "uint8_t";
-template<> const char* TypeName<uint16_t>::value = "uint16_t";
-template<> const char* TypeName<uint32_t>::value = "uint32_t";
-template<> const char* TypeName<uint64_t>::value = "uint64_t";
-template<> const char* TypeName<int8_t>::value = "int8_t";
-template<> const char* TypeName<int16_t>::value = "int16_t";
-template<> const char* TypeName<int32_t>::value = "int32_t";
-template<> const char* TypeName<int64_t>::value = "int64_t";
+template<> const char* TypeName<uint8_t>::value = "u8";
+template<> const char* TypeName<uint16_t>::value = "u16";
+template<> const char* TypeName<uint32_t>::value = "u32";
+template<> const char* TypeName<uint64_t>::value = "u64";
+template<> const char* TypeName<int8_t>::value = "i8";
+template<> const char* TypeName<int16_t>::value = "i16";
+template<> const char* TypeName<int32_t>::value = "i32";
+template<> const char* TypeName<int64_t>::value = "i64";
 template<> const char* TypeName<float>::value = "float";
 template<> const char* TypeName<double>::value = "double";
 template<> const char* TypeName<bool>::value = "bool";
@@ -224,3 +224,17 @@ std::string BinaryEditor::read_length_prefixed_string() {
 template std::string BinaryEditor::read_length_prefixed_string<uint8_t>();
 template std::string BinaryEditor::read_length_prefixed_string<uint16_t>();
 template std::string BinaryEditor::read_length_prefixed_string<uint32_t>();
+
+// 获取历史记录列表（按时间顺序：最早到最新）
+std::vector<Record> BinaryEditor::get_read_history() const {
+    std::vector<Record> history;
+    auto temp = read_history; // 复制栈
+    
+    // 将栈转换为列表（先进先出顺序）
+    while (!temp.empty()) {
+        history.insert(history.begin(), temp.top()); // 插入到头部
+        temp.pop();
+    }
+    
+    return history;
+}

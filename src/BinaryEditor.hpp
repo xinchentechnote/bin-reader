@@ -52,6 +52,7 @@ public:
     size_t read_index() const;
     void set_read_index(u_int32_t read_index);
     size_t size() const;
+    std::vector<Record> get_read_history() const;
 
 private:
     std::fstream file;

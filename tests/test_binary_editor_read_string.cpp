@@ -100,7 +100,10 @@ TEST_F(StringTest, UndoOperations) {
     auto s1 = editor.read_fixed_string(10);
     // 读取带前缀字符串
     auto s2 = editor.read_length_prefixed_string<uint32_t>();
-    
+    std::vector<Record> records = editor.get_read_history();
+    EXPECT_EQ(records.size(), 2);
+    EXPECT_EQ(records[0].type_name, "string[10]");
+    EXPECT_EQ(records[1].type_name, "u32@string");
     // 验证undo操作
     editor.undo(); // 撤销前缀字符串
     editor.undo(); // 撤销定长字符串
