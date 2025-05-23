@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <ftxui/screen/screen.hpp>
-#include "../src/AppState.hpp"
-#include "../src/EventHandlers.hpp"
+#include "AppState.hpp"
+#include "EventHandlers.hpp"
 
 TEST(EventHandlersTest, PageNavigation) {
     AppState state;

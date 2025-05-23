@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/BinaryEditor.hpp"
+#include "BinaryEditor.hpp"
 #include <fstream>
 #include <cstdio>
 

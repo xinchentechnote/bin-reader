@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <ftxui/component/screen_interactive.hpp>
-#include "../src/AppState.hpp"
-#include "../src/UIComponents.hpp"
+#include "AppState.hpp"
+#include "UIComponents.hpp"
 
 using namespace ftxui;
 
