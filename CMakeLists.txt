@@ -95,7 +95,10 @@ if(BUILD_TESTING)
   add_executable(bin-reader-tests
     tests/test_binary_editor_read_base_type.cpp
     tests/test_binary_editor_read_string.cpp
-    src/BinaryEditor.cpp  # 包含实现文件
+    tests/test_events.cpp
+    tests/test_integration.cpp
+    tests/test_ui_components.cpp
+    src/BinaryEditor.cpp
   )
 
   target_include_directories(bin-reader-tests PRIVATE
@@ -105,6 +108,10 @@ if(BUILD_TESTING)
   target_link_libraries(bin-reader-tests PRIVATE
     GTest::gtest_main
     pthread
+    ftxui::screen
+    ftxui::dom
+    ftxui::component
+    fmt::fmt
   )
 
   include(GoogleTest)
