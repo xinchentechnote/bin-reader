@@ -72,6 +72,9 @@ endif()
 #--------------------- 主程序目标配置 ----------------------
 add_executable(bin-reader
   src/main.cpp
+  src/EventHandlers.cpp
+  src/UIComponents.cpp
+  src/AppState.cpp
 )
 
 target_include_directories(bin-reader PRIVATE
@@ -95,10 +98,14 @@ if(BUILD_TESTING)
     tests/test_events.cpp
     tests/test_integration.cpp
     tests/test_ui_components.cpp
+    src/EventHandlers.cpp
+    src/UIComponents.cpp
+    src/AppState.cpp
   )
 
   target_include_directories(bin-reader-tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
   target_link_libraries(bin-reader-tests PRIVATE

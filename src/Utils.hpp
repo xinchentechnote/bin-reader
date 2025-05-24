@@ -1,11 +1,30 @@
 #pragma once
 #include <fmt/format.h>
-#include <type_traits>
-#include <vector>
 #include <fstream>
 #include <iterator>
+#include <type_traits>
+#include <vector>
+
+#include "CLI11.hpp"
 
 namespace Utils {
+inline std::string ParseCommandLine(int argc, char **argv) {
+  CLI::App app{"bin-reader"};
+  std::string file_path;
+
+  app.add_option("-f,--file", file_path, "Binary file to load")
+      ->required()
+      ->check(CLI::ExistingFile);
+
+  try {
+    app.parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    std::exit(app.exit(e));
+  }
+
+  return file_path;
+}
+
 // 数值格式化模板函数
 template <typename T> inline std::string format_value(T value) {
   if constexpr (std::is_floating_point_v<T>) {
@@ -55,24 +74,24 @@ inline std::string format_any(const std::any &data) {
   return "Unsupported Type";
 }
 
-inline std::vector<uint8_t> read_binary_file(const std::string& path) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) {
-        throw std::runtime_error("Cannot open file: " + path);
-    }
-    
-    auto file_size = file.tellg();
-    if (file_size == -1) {
-        throw std::runtime_error("Cannot determine file size");
-    }
-    
-    file.seekg(0);
-    std::vector<uint8_t> data(file_size);
-    
-    if (!file.read(reinterpret_cast<char*>(data.data()), file_size)) {
-        throw std::runtime_error("File read error");
-    }
-    
-    return data;
+inline std::vector<uint8_t> read_binary_file(const std::string &path) {
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  if (!file) {
+    throw std::runtime_error("Cannot open file: " + path);
+  }
+
+  auto file_size = file.tellg();
+  if (file_size == -1) {
+    throw std::runtime_error("Cannot determine file size");
+  }
+
+  file.seekg(0);
+  std::vector<uint8_t> data(file_size);
+
+  if (!file.read(reinterpret_cast<char *>(data.data()), file_size)) {
+    throw std::runtime_error("File read error");
+  }
+
+  return data;
 }
 } // namespace Utils

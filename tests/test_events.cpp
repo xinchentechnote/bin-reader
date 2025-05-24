@@ -1,5 +1,6 @@
 #include "AppState.hpp"
 #include "EventHandlers.hpp"
+#include "UIComponents.hpp"
 #include <ftxui/screen/screen.hpp>
 #include <gtest/gtest.h>
 
