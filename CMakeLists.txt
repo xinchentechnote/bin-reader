@@ -73,8 +73,6 @@ endif()
 add_executable(bin-reader
   src/main.cpp
   src/BinaryEditor.cpp
-  src/EditorController.cpp
-  src/EditorView.cpp
 )
 
 target_include_directories(bin-reader PRIVATE
