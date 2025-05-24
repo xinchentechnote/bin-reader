@@ -1,6 +1,9 @@
 #pragma once
 #include <fmt/format.h>
 #include <type_traits>
+#include <vector>
+#include <fstream>
+#include <iterator>
 
 namespace Utils {
 // 数值格式化模板函数
@@ -50,5 +53,26 @@ inline std::string format_any(const std::any &data) {
     return std::any_cast<std::string>(data);
 
   return "Unsupported Type";
+}
+
+inline std::vector<uint8_t> read_binary_file(const std::string& path) {
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        throw std::runtime_error("Cannot open file: " + path);
+    }
+    
+    auto file_size = file.tellg();
+    if (file_size == -1) {
+        throw std::runtime_error("Cannot determine file size");
+    }
+    
+    file.seekg(0);
+    std::vector<uint8_t> data(file_size);
+    
+    if (!file.read(reinterpret_cast<char*>(data.data()), file_size)) {
+        throw std::runtime_error("File read error");
+    }
+    
+    return data;
 }
 } // namespace Utils

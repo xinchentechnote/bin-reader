@@ -61,8 +61,9 @@ inline Component StatusBar(AppState &state) {
         text(fmt::format(" Page: {}/{} ", state.current_page + 1,
                          state.total_pages())) |
             bgcolor(Color::DarkGreen),
-        text(fmt::format(" {} ", state.status_msg)) | bgcolor(Color::DarkRed) |
-            flex,
+        text(fmt::format(" {} ", state.status_msg)) | bgcolor(Color::DarkRed),
+        text(fmt::format(" File: {} ", state.file_name)) |
+            bgcolor(Color::DarkBlue) | flex,
     });
   });
 }

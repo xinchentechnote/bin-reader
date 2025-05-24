@@ -5,6 +5,7 @@
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
 #include <iomanip>
+#include <filesystem>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -50,10 +51,19 @@ struct AppState {
   size_t cursor_pos = 0;        // 当前光标位置
   size_t bytes_per_line = 16;   // 每行显示字节数
   size_t current_page = 0;      // 当前页
-  size_t hex_view_h = 5;        // hex view 高度
+  size_t hex_view_h = 16;        // hex view 高度
   std::string status_msg;       // 状态消息
   bool is_little_endian = true; // 默认小端序
   std::stack<Record> read_history;
+
+  std::string file_name;
+
+  void load_file(const std::string &path) {
+    data = Utils::read_binary_file(path);
+    file_name = std::filesystem::path(path).filename().string();
+    cursor_pos = 0;
+    current_page = 0;
+  }
 
   // 计算总页数
   [[nodiscard]] size_t total_pages() const {

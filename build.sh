@@ -8,3 +8,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug --log-level=VERBOSE -DBUILD_TESTING=ON
 cmake --build build
 cd build && ctest -V
 cd -
+./build/bin/bin-reader -f tests/data/HelloWorld.class
