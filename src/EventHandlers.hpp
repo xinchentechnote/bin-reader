@@ -43,6 +43,10 @@ auto HandleCommands(AppState &state, std::string &command_input,
       std::string cmd;
       iss >> cmd;
 
+      if (cmd == "u") {
+        state.undo();
+      }
+
       if (cmd == "be") {
         state.is_little_endian = false;
         state.status_msg = "Big-endian mode";

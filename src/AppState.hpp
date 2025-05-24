@@ -137,9 +137,18 @@ struct AppState {
     }
   }
 
+  void undo() {
+    if (!read_history.empty()) {
+      // 撤销读取：回退读取索引
+      Record record = read_history.top();
+      set_cursor_pos(record.index);
+      read_history.pop();
+    }
+  }
+
   //光标移动
   bool set_cursor_pos(size_t new_pos) {
-    if (0 < new_pos && new_pos < data.size() - 1) {
+    if (new_pos <= data.size()) {
       cursor_pos = new_pos;
       update_page();
       return true;
@@ -148,7 +157,7 @@ struct AppState {
   }
   bool move(size_t offset) {
     size_t new_pos = cursor_pos + offset;
-    if (data.size() - 1 > new_pos && new_pos > 0) {
+    if (data.size() >= new_pos && new_pos > 0) {
       cursor_pos = new_pos;
       update_page();
       return true;

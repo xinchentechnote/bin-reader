@@ -72,7 +72,6 @@ endif()
 #--------------------- 主程序目标配置 ----------------------
 add_executable(bin-reader
   src/main.cpp
-  src/BinaryEditor.cpp
 )
 
 target_include_directories(bin-reader PRIVATE
@@ -91,12 +90,10 @@ if(BUILD_TESTING)
   enable_testing()
 
   add_executable(bin-reader-tests
-    tests/test_binary_editor_read_base_type.cpp
-    tests/test_binary_editor_read_string.cpp
+    tests/test_app_state.cpp
     tests/test_events.cpp
     tests/test_integration.cpp
     tests/test_ui_components.cpp
-    src/BinaryEditor.cpp
   )
 
   target_include_directories(bin-reader-tests PRIVATE
