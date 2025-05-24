@@ -90,15 +90,69 @@ struct AppState {
     T value = peek<T>(pos);
     // 添加记录到历史堆栈
     read_history.push(Record{pos, value});
-    cursor_pos += sizeof(T);
+    move(sizeof(T));
     return value;
+  }
+
+  // 读取定长字符串
+  std::string read_fixed_string(size_t pos, size_t n) {
+    if (pos + n > data.size()) {
+      throw std::out_of_range("Read operation exceeds data size");
+    }
+
+    // 读取原始字节
+    std::string str(data.begin() + pos, data.begin() + pos + n);
+    move(n);
+
+    // 记录读取历史
+    read_history.push(Record{pos, str});
+
+    return str;
+  }
+
+  // 读取长度前缀字符串（模板化长度类型）
+  template <typename LengthType>
+  std::string read_length_prefixed_string(size_t pos) {
+    const size_t start_pos = cursor_pos;
+
+    try {
+      // 读取长度前缀
+      LengthType len = read<LengthType>(pos);
+
+      // 读取字符串内容
+      std::string str = read_fixed_string(pos + sizeof(LengthType), len);
+
+      // 用整体操作替换两个独立记录
+      read_history.pop(); // 移除固定字符串记录
+      read_history.pop(); // 移除长度前缀记录
+
+      // 创建合并记录
+      read_history.push(Record{start_pos, str});
+
+      return str;
+    } catch (...) {
+      // 发生异常时恢复读取位置
+      cursor_pos = start_pos;
+      throw;
+    }
+  }
+
+   //光标前移
+  bool move(size_t offset) {
+    size_t new_pos = cursor_pos + offset;
+    if (data.size() - 1 > new_pos && new_pos > 0) {
+      cursor_pos = new_pos;
+      update_page();
+      return true;
+    }
+    return false;
   }
 
   //光标前移
   bool pre() {
     if (cursor_pos > 0) {
       cursor_pos--;
-      current_page = cursor_pos / bytes_per_line / hex_view_h;
+      update_page();
       return true;
     }
     return false;
@@ -108,7 +162,7 @@ struct AppState {
   bool next() {
     if (cursor_pos < data.size() - 1) {
       cursor_pos++;
-      current_page = cursor_pos / bytes_per_line / hex_view_h;
+      update_page();
       return true;
     }
     return false;
@@ -117,7 +171,7 @@ struct AppState {
   bool pre_line() {
     if (cursor_pos >= bytes_per_line) {
       cursor_pos -= bytes_per_line;
-      current_page = cursor_pos / bytes_per_line / hex_view_h;
+      update_page();
       return true;
     }
     return false;
@@ -126,10 +180,14 @@ struct AppState {
   bool next_line() {
     if (cursor_pos + bytes_per_line < data.size() - 1) {
       cursor_pos += bytes_per_line;
-      current_page = cursor_pos / bytes_per_line / hex_view_h;
+      update_page();
       return true;
     }
     return false;
+  }
+
+  void update_page() {
+    current_page = cursor_pos / bytes_per_line / hex_view_h;
   }
 
   bool next_page() {
@@ -193,6 +251,37 @@ private:
   std::string typeName_;
 };
 
+class FixStringReader : public ReaderStrategy {
+public:
+  bool read(AppState &state) const override {
+    try {
+      auto orig_pos = state.cursor_pos;
+      auto value = state.read_fixed_string(state.cursor_pos, 5);
+      state.status_msg = fmt::format("Read char[{}]: {} @ 0x{:X}", 5,
+                                     Utils::format_value(value), orig_pos);
+      return true;
+    } catch (const std::exception &e) {
+      state.status_msg = fmt::format("String read failed: {}", e.what());
+      return false;
+    }
+  }
+};
+
+template <typename LengthType>
+class LengthPrefixedStringReader : public ReaderStrategy {
+public:
+  bool read(AppState &state) const override {
+
+    auto orig_pos = state.cursor_pos;
+    auto value =
+        state.read_length_prefixed_string<LengthType>(state.cursor_pos);
+    state.status_msg =
+        fmt::format("Read lpstring: {} @ 0x{:X}",
+                    Utils::format_value(value), orig_pos);
+    return true;
+  }
+};
+
 class ReaderFactory {
   using StrategyMap =
       std::unordered_map<std::string, std::unique_ptr<ReaderStrategy>>;
@@ -215,6 +304,19 @@ public:
     emplaceReader<int64_t>("i64");
     emplaceReader<float>("f32");
     emplaceReader<double>("f64");
+    readers_.emplace("string", std::make_unique<FixStringReader>());
+    readers_.emplace("string@u8",
+                     std::make_unique<LengthPrefixedStringReader<uint8_t>>());
+    readers_.emplace("string@u16",
+                     std::make_unique<LengthPrefixedStringReader<uint16_t>>());
+    readers_.emplace("string@u32",
+                     std::make_unique<LengthPrefixedStringReader<uint32_t>>());
+    readers_.emplace("string@i8",
+                     std::make_unique<LengthPrefixedStringReader<int8_t>>());
+    readers_.emplace("string@i16",
+                     std::make_unique<LengthPrefixedStringReader<int16_t>>());
+    readers_.emplace("string@i32",
+                     std::make_unique<LengthPrefixedStringReader<int32_t>>());
   }
 
   template <typename T> void emplaceReader(const std::string &typeName) {

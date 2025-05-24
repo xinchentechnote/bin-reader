@@ -34,7 +34,7 @@ int main() {
           {status_bar,
            Container::Horizontal({hex_view | flex,
                                   data_preview | size(WIDTH, EQUAL, 35),
-                                  data_history | size(WIDTH, EQUAL, 35)}) |
+                                  data_history | size(WIDTH, EQUAL, 70)}) |
                flex,
            command_line | size(HEIGHT, EQUAL, 3)}) |
       flex;
