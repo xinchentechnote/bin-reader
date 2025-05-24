@@ -43,26 +43,52 @@ auto HandleCommands(AppState &state, std::string &command_input,
       std::string cmd;
       iss >> cmd;
 
-      if (cmd == "set") {
+      if (cmd == "be") {
+        state.is_little_endian = false;
+        state.status_msg = "Big-endian mode";
+      } else if (cmd == "le") {
+        state.is_little_endian = true;
+        state.status_msg = "Little-endian mode";
+      }
+
+      if (cmd == "j") {
         std::string subcmd;
         iss >> subcmd;
 
-        if (subcmd == "be") {
-          state.is_little_endian = false;
-          state.status_msg = "Big-endian mode";
-        } else if (subcmd == "le") {
-          state.is_little_endian = true;
-          state.status_msg = "Little-endian mode";
-        } else if (subcmd == "pos") {
-          size_t new_pos;
-          if (iss >> new_pos) {
+        try {
+          if (subcmd.empty()) {
+            // Show current position
+            state.status_msg =
+                fmt::format("Current position: 0x{:X}", state.cursor_pos);
+          } else if (subcmd[0] == '+' || subcmd[0] == '-') {
+            // Relative jump (+N or -N)
+            long offset = std::stol(subcmd);
+            if (state.move(static_cast<size_t>(offset))) {
+              state.status_msg = fmt::format("Jumped {} bytes to 0x{:X}",
+                                             offset, state.cursor_pos);
+            } else {
+              state.status_msg = "Invalid relative position!";
+            }
+          } else {
+            // Absolute jump (hex or decimal)
+            size_t new_pos;
+            if (subcmd.substr(0, 2) == "0x") {
+              // Hex input
+              new_pos = std::stoul(subcmd, nullptr, 16);
+            } else {
+              // Decimal input
+              new_pos = std::stoul(subcmd);
+            }
+
             if (new_pos < state.data.size()) {
-              state.cursor_pos = new_pos;
+              state.set_cursor_pos(new_pos);
               state.status_msg = fmt::format("Position set to 0x{:X}", new_pos);
             } else {
-              state.status_msg = "Invalid position!";
+              state.status_msg = "Invalid absolute position!";
             }
           }
+        } catch (const std::exception &e) {
+          state.status_msg = fmt::format("Invalid position format: {}", subcmd);
         }
       }
 

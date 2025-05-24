@@ -137,7 +137,15 @@ struct AppState {
     }
   }
 
-   //光标前移
+  //光标移动
+  bool set_cursor_pos(size_t new_pos) {
+    if (0 < new_pos && new_pos < data.size() - 1) {
+      cursor_pos = new_pos;
+      update_page();
+      return true;
+    }
+    return false;
+  }
   bool move(size_t offset) {
     size_t new_pos = cursor_pos + offset;
     if (data.size() - 1 > new_pos && new_pos > 0) {
@@ -275,9 +283,8 @@ public:
     auto orig_pos = state.cursor_pos;
     auto value =
         state.read_length_prefixed_string<LengthType>(state.cursor_pos);
-    state.status_msg =
-        fmt::format("Read lpstring: {} @ 0x{:X}",
-                    Utils::format_value(value), orig_pos);
+    state.status_msg = fmt::format("Read lpstring: {} @ 0x{:X}",
+                                   Utils::format_value(value), orig_pos);
     return true;
   }
 };
