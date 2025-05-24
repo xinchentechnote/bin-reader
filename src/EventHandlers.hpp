@@ -7,6 +7,7 @@
 #include <string>
 
 #include "AppState.hpp"
+#include "Utils.hpp"
 
 using namespace ftxui;
 // ========== 事件处理 ==========
@@ -73,8 +74,9 @@ namespace EventHandlers
         };
     }
 
-    auto HandleCommands(AppState& state, std::string& command_input) {
+    auto HandleCommands(AppState& state, std::string& command_input, ftxui::ScreenInteractive &screen) {
     return [&](const Event& event) {
+        (void) screen;
         if (event == Event::Return) {
             // 解析命令
             std::istringstream iss(command_input);
@@ -101,6 +103,22 @@ namespace EventHandlers
                             state.status_msg = "Invalid position!";
                         }
                     }
+                }
+            }
+
+            if (cmd == "r") {
+                std::string type;
+                iss >> type;
+                
+                try {
+                    if (type == "u32") {
+                        auto value = state.read<uint32_t>(state.cursor_pos);
+                        state.status_msg = fmt::format("Read u32: {} @ 0x{:X}", 
+                            Utils::format_value(value), state.cursor_pos);
+                        return true;
+                    }
+                } catch (const std::out_of_range& e) {
+                    state.status_msg = "Read failed: Out of range";
                 }
             }
             

@@ -5,8 +5,10 @@
 #include <fmt/format.h>
 #include <vector>
 #include <string>
+#include <iostream>
 
 #include "AppState.hpp"
+#include "Utils.hpp"
 
 using namespace ftxui;
 // ========== UI组件 ==========
@@ -18,9 +20,9 @@ namespace UIComponents
                         {
             const auto term = Terminal::Size();
             const int term_height = term.dimy;
+            if (term_height < 5) return text("Terminal too small");
             const size_t content_height = static_cast<size_t>(std::max(1, term_height - 4));
             const size_t start_line = state.current_page * content_height;
-
             Elements lines;
             for (size_t i = 0; i < content_height; ++i) {
                 const size_t addr = (start_line + i) * state.bytes_per_line;
@@ -74,42 +76,77 @@ namespace UIComponents
                        hbox({text("Endian:") | bold | color(Color::GrayDark),
                              text(endian_str)}),
                        hbox({text(" i8: ") | color(Color::Green) | flex_shrink,
-                             text(state.read_value<int8_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<int8_t>(pos))) | flex_grow}),
                        hbox({text(" u8: ") | color(Color::Cyan) | flex_shrink,
-                             text(state.read_value<uint8_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<uint8_t>(pos))) | flex_grow}),
                        hbox({text("i16: ") | color(Color::Yellow) | flex_shrink,
-                             text(state.read_value<int16_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<int16_t>(pos))) | flex_grow}),
                        hbox({text("u16: ") | color(Color::Magenta) | flex_shrink,
-                             text(state.read_value<uint16_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<uint16_t>(pos))) | flex_grow}),
                        hbox({text("i32: ") | color(Color::Red) | flex_shrink,
-                             text(state.read_value<int32_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<int32_t>(pos))) | flex_grow}),
                        hbox({text("u32: ") | color(Color::Blue) | flex_shrink,
-                             text(state.read_value<uint32_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<uint32_t>(pos))) | flex_grow}),
                        hbox({text("i64: ") | color(Color::Red) | flex_shrink,
-                             text(state.read_value<int64_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<int64_t>(pos))) | flex_grow}),
                        hbox({text("u64: ") | color(Color::Blue) | flex_shrink,
-                             text(state.read_value<uint64_t>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<uint64_t>(pos))) | flex_grow}),
                        hbox({text("f32: ") | color(Color::White) | flex_shrink,
-                             text(state.read_value<float>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<float>(pos))) | flex_grow}),
                        hbox({text("f64: ") | color(Color::White) | flex_shrink,
-                             text(state.read_value<double>(pos)) | flex_grow}),
+                             text(Utils::format_value(state.peek<double>(pos))) | flex_grow}),
                    }) |
                    border | size(WIDTH, EQUAL, 30); // 固定右侧宽度
         });
     }
 
-    inline Component CommandLine(std::string& command_input) {
+    inline Component DataReadHistoryBar(AppState& state) {
+        return Renderer([&] {
+            size_t pos = state.cursor_pos;
+            std::string addr_str = fmt::format("{:08X}", pos);
+            std::vector<Record> records = state.get_read_history();
+            // 生成历史记录元素
+            Elements history_lines;
+            for (const auto& record : records) {
+                history_lines.push_back(
+                    hbox({
+                        // 地址部分
+                        text(fmt::format("{:08X}:", record.index)) 
+                            | color(Color::Green) 
+                            | flex_shrink,
+                        // 类型标签
+                        text(" " + record.type_name + ": ") | color(Color::Green) ,
+                        // 数据值
+                        text(Utils::format_any(record.data)) 
+                            | flex_grow
+                    }) | borderLight
+                );
+            }
+            return vbox(std::move(history_lines)) |
+                   border | size(WIDTH, EQUAL, 30); // 固定右侧宽度
+        });
+    }
+
+   inline Component CommandLine(AppState& state, std::string& command_input) {
+        (void)state;
+
+        // 初始化所有InputOption字段（C++17兼容）
         ftxui::InputOption options;
         options.placeholder = "Command (set be/le/pos <num>)";
         options.password = false;
-        
-        auto input_component = Input(&command_input, options);
+        options.multiline = false;          // 明确关闭多行模式
+        options.transform = [](auto state) { return state.element; }; // 默认转换
+        options.on_enter = []{};            // 空回车处理函数
 
-        return Renderer(input_component, [&] {
+        auto input = Input(&command_input, options);
+
+        return Renderer(input, [=] {
             return hbox({
                 text("> ") | color(Color::Green),
-                input_component->Render() 
-            });
+                input->Render() | flex
+            }) 
+            | border 
+            | size(HEIGHT, EQUAL, 3);
         });
     }
 }
