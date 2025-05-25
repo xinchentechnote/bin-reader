@@ -3,6 +3,10 @@
 #include <any>
 #include <cstdint>
 #include <filesystem>
+#include <fmt/format.h>
+#include <ftxui/component/component.hpp>
+#include <ftxui/component/screen_interactive.hpp>
+#include <ftxui/dom/elements.hpp>
 #include <iomanip>
 #include <istream>
 #include <memory>
@@ -10,17 +14,101 @@
 #include <sstream>
 #include <stack>
 #include <string>
+#include <type_traits>
+#include <typeindex>
 #include <unordered_map>
 #include <vector>
-
-#include <fmt/format.h>
-#include <ftxui/component/component.hpp>
-#include <ftxui/component/screen_interactive.hpp>
-#include <ftxui/dom/elements.hpp>
 
 #include "Utils.hpp"
 
 using namespace ftxui;
+
+template <typename T> struct TypeTraits {
+  static constexpr const char *name = "unknown";
+  static constexpr const char *short_name = "unknown";
+};
+
+template <> struct TypeTraits<uint8_t> {
+  static constexpr const char *name = "uint8_t";
+  static constexpr const char *short_name = "u8";
+};
+
+template <> struct TypeTraits<int8_t> {
+  static constexpr const char *name = "int8_t";
+  static constexpr const char *short_name = "i8";
+};
+
+template <> struct TypeTraits<uint16_t> {
+  static constexpr const char *name = "uint16_t";
+  static constexpr const char *short_name = "u16";
+};
+template <> struct TypeTraits<int16_t> {
+  static constexpr const char *name = "int16_t";
+  static constexpr const char *short_name = "i16";
+};
+template <> struct TypeTraits<uint32_t> {
+  static constexpr const char *name = "uint32_t";
+  static constexpr const char *short_name = "u32";
+};
+template <> struct TypeTraits<int32_t> {
+  static constexpr const char *name = "int32_t";
+  static constexpr const char *short_name = "i32";
+};
+template <> struct TypeTraits<uint64_t> {
+  static constexpr const char *name = "uint64_t";
+  static constexpr const char *short_name = "u64";
+};
+template <> struct TypeTraits<int64_t> {
+  static constexpr const char *name = "int64_t";
+  static constexpr const char *short_name = "i64";
+};
+template <> struct TypeTraits<float> {
+  static constexpr const char *name = "float";
+  static constexpr const char *short_name = "f32";
+};
+template <> struct TypeTraits<double> {
+  static constexpr const char *name = "double";
+  static constexpr const char *short_name = "f64";
+};
+
+class TypeFactory {
+private:
+  std::unordered_map<std::string, std::type_index> type_map_;
+
+  template <typename T> void registerType() {
+    // Store type_index with proper initialization
+    const std::type_index type_idx(typeid(T));
+    type_map_.insert_or_assign(TypeTraits<T>::short_name, type_idx);
+    type_map_.insert_or_assign(TypeTraits<T>::name, type_idx);
+  }
+
+  TypeFactory() {
+    // Register basic types
+    registerType<uint8_t>();
+    registerType<int8_t>();
+    registerType<uint16_t>();
+    registerType<int16_t>();
+    registerType<uint32_t>();
+    registerType<int32_t>();
+    registerType<uint64_t>();
+    registerType<int64_t>();
+    registerType<float>();
+    registerType<double>();
+  }
+
+public:
+  TypeFactory(const TypeFactory &) = delete;
+  TypeFactory &operator=(const TypeFactory &) = delete;
+
+  static TypeFactory &instance() {
+    static TypeFactory inst;
+    return inst;
+  }
+
+  template <typename T> static std::string getTypeShortName() {
+    return TypeTraits<T>::short_name;
+  }
+};
 
 // ========== Record ==========
 /// 记录一次读取操作：记录读取位置 + 读到的数据 + 类型名称
@@ -94,7 +182,9 @@ struct AppState {
   /// history；光标向前移动 sizeof(T) 字节
   template <typename T> T read(size_t pos) {
     T value = peek<T>(pos);
-    read_history.push(Record{pos, value});
+    auto record = Record{pos, value};
+    record.type_name = fmt::format("{}", TypeFactory::getTypeShortName<T>());
+    read_history.push(record);
     move(sizeof(T));
     return value;
   }
@@ -106,7 +196,9 @@ struct AppState {
     }
     std::string str(data.begin() + pos, data.begin() + pos + n);
     move(n);
-    read_history.push(Record{pos, str});
+    auto record = Record{pos, str};
+    record.type_name = fmt::format("char[{}]", n);
+    read_history.push(record);
     return str;
   }
 
@@ -122,7 +214,10 @@ struct AppState {
       // 因为我们想把“长度前缀”和“字符串”当作一个整体记录，所以先弹出它们，再合并成一个
       read_history.pop(); // 弹出固定字符串那条
       read_history.pop(); // 弹出长度前缀那条
-      read_history.push(Record{start_pos, str});
+      auto record = Record{start_pos, str};
+      record.type_name =
+          fmt::format("string@{}", TypeFactory::getTypeShortName<LengthType>());
+      read_history.push(record);
       return str;
     } catch (...) {
       cursor_pos = start_pos; // 恢复光标
@@ -325,7 +420,7 @@ private:
   ReaderFactory(const ReaderFactory &) = delete;
   ReaderFactory &operator=(const ReaderFactory &) = delete;
 
-  template <typename T> void emplaceReader(const std::string &typeName);
+  template <typename T> void emplaceReader();
 
   using StrategyMap =
       std::unordered_map<std::string, std::unique_ptr<ReaderStrategy>>;

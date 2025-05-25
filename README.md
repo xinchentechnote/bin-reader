@@ -8,14 +8,14 @@
 
 - **交互式 TUI**: 使用 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 构建直观的命令行界面。
 - **基本数据类型**: i8 u8 i16 u16 i32 u32 i64 u64 f32 f64
-- **字符串类型**: char[n] u8@string@utf8 
+- **字符串类型**: char[n] string@u8
 - **多数据类型解析**:
   - `r i32 [N]`: 读取 `int32` 类型（默认 `N=1`）。
   - `r i16 [N]`: 读取 `int16` 类型。
   - `r u16 [N]`: 读取 `uint16` 类型。
   - `r u16 [N] u32 [N]`: 读取 `uint16` 类型。
   - `r char[10]`: 读取定长字符串。
-  - `r u8@string@utf8`: 读取长度前缀为u8的UTF-8变长字符串。
+  - `r string@u8`: 读取长度前缀为u8的变长字符串。
 - **历史回滚**: 输入 `u` 撤销上一步操作。
 - **实时信息**: 输入 `info` 显示当前文件偏移量和大小。
 - **实时信息**: 输入 `list` 显示已读数据

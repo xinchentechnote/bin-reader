@@ -299,3 +299,58 @@ TEST(RecordTest, DescriptionFormatting) {
   std::string desc = r1.description();
   EXPECT_NE(desc.find("00000010:u16:"), std::string::npos);
 }
+
+TEST(TypeTraitsTest, BasicTypeNames) {
+  // Test short names
+  EXPECT_STREQ(TypeTraits<uint8_t>::short_name, "u8");
+  EXPECT_STREQ(TypeTraits<int8_t>::short_name, "i8");
+  EXPECT_STREQ(TypeTraits<uint16_t>::short_name, "u16");
+  EXPECT_STREQ(TypeTraits<int16_t>::short_name, "i16");
+  EXPECT_STREQ(TypeTraits<uint32_t>::short_name, "u32");
+  EXPECT_STREQ(TypeTraits<int32_t>::short_name, "i32");
+  EXPECT_STREQ(TypeTraits<uint64_t>::short_name, "u64");
+  EXPECT_STREQ(TypeTraits<int64_t>::short_name, "i64");
+  EXPECT_STREQ(TypeTraits<float>::short_name, "f32");
+  EXPECT_STREQ(TypeTraits<double>::short_name, "f64");
+
+  // Test full names
+  EXPECT_STREQ(TypeTraits<uint8_t>::name, "uint8_t");
+  EXPECT_STREQ(TypeTraits<int8_t>::name, "int8_t");
+  EXPECT_STREQ(TypeTraits<uint16_t>::name, "uint16_t");
+  EXPECT_STREQ(TypeTraits<int16_t>::name, "int16_t");
+  EXPECT_STREQ(TypeTraits<uint32_t>::name, "uint32_t");
+  EXPECT_STREQ(TypeTraits<int32_t>::name, "int32_t");
+  EXPECT_STREQ(TypeTraits<uint64_t>::name, "uint64_t");
+  EXPECT_STREQ(TypeTraits<int64_t>::name, "int64_t");
+  EXPECT_STREQ(TypeTraits<float>::name, "float");
+  EXPECT_STREQ(TypeTraits<double>::name, "double");
+}
+
+TEST(TypeFactoryTest, SingletonBehavior) {
+  auto &factory1 = TypeFactory::instance();
+  auto &factory2 = TypeFactory::instance();
+
+  // Verify singleton behavior
+  EXPECT_EQ(&factory1, &factory2);
+}
+
+TEST(TypeFactoryTest, GetTypeName) {
+  // Verify static type name access
+  EXPECT_EQ(TypeFactory::getTypeShortName<uint8_t>(), "u8");
+  EXPECT_EQ(TypeFactory::getTypeShortName<int8_t>(), "i8");
+  EXPECT_EQ(TypeFactory::getTypeShortName<uint16_t>(), "u16");
+  EXPECT_EQ(TypeFactory::getTypeShortName<int16_t>(), "i16");
+  EXPECT_EQ(TypeFactory::getTypeShortName<uint32_t>(), "u32");
+  EXPECT_EQ(TypeFactory::getTypeShortName<int32_t>(), "i32");
+  EXPECT_EQ(TypeFactory::getTypeShortName<uint64_t>(), "u64");
+  EXPECT_EQ(TypeFactory::getTypeShortName<int64_t>(), "i64");
+  EXPECT_EQ(TypeFactory::getTypeShortName<float>(), "f32");
+  EXPECT_EQ(TypeFactory::getTypeShortName<double>(), "f64");
+}
+
+TEST(TypeTraitsTest, DefaultUnknownType) {
+  // Verify default unknown type handling
+  struct UnknownType {};
+  EXPECT_STREQ(TypeTraits<UnknownType>::short_name, "unknown");
+  EXPECT_STREQ(TypeTraits<UnknownType>::name, "unknown");
+}

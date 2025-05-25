@@ -12,16 +12,16 @@ const ReaderFactory &ReaderFactory::instance() {
 ReaderFactory::ReaderFactory() {
   // 把各种 TypedReader<T> 和 FixStringReader、LengthPrefixedStringReader 注册到
   // readers_ 中
-  emplaceReader<uint8_t>("u8");
-  emplaceReader<int8_t>("i8");
-  emplaceReader<uint16_t>("u16");
-  emplaceReader<int16_t>("i16");
-  emplaceReader<uint32_t>("u32");
-  emplaceReader<int32_t>("i32");
-  emplaceReader<uint64_t>("u64");
-  emplaceReader<int64_t>("i64");
-  emplaceReader<float>("f32");
-  emplaceReader<double>("f64");
+  emplaceReader<uint8_t>();
+  emplaceReader<int8_t>();
+  emplaceReader<uint16_t>();
+  emplaceReader<int16_t>();
+  emplaceReader<uint32_t>();
+  emplaceReader<int32_t>();
+  emplaceReader<uint64_t>();
+  emplaceReader<int64_t>();
+  emplaceReader<float>();
+  emplaceReader<double>();
 
   readers_.emplace("fixstring", std::make_unique<FixStringReader>());
   readers_.emplace("string@u8",
@@ -49,19 +49,19 @@ bool ReaderFactory::read(AppState &state, const std::string &type) const {
   return false;
 }
 
-template <typename T>
-void ReaderFactory::emplaceReader(const std::string &typeName) {
+template <typename T> void ReaderFactory::emplaceReader() {
+  std::string typeName = TypeFactory::getTypeShortName<T>();
   readers_.emplace(typeName, std::make_unique<TypedReader<T>>(typeName));
 }
 
 // 显式实例化
-template void ReaderFactory::emplaceReader<uint8_t>(const std::string &);
-template void ReaderFactory::emplaceReader<int8_t>(const std::string &);
-template void ReaderFactory::emplaceReader<uint16_t>(const std::string &);
-template void ReaderFactory::emplaceReader<int16_t>(const std::string &);
-template void ReaderFactory::emplaceReader<uint32_t>(const std::string &);
-template void ReaderFactory::emplaceReader<int32_t>(const std::string &);
-template void ReaderFactory::emplaceReader<uint64_t>(const std::string &);
-template void ReaderFactory::emplaceReader<int64_t>(const std::string &);
-template void ReaderFactory::emplaceReader<float>(const std::string &);
-template void ReaderFactory::emplaceReader<double>(const std::string &);
+template void ReaderFactory::emplaceReader<uint8_t>();
+template void ReaderFactory::emplaceReader<int8_t>();
+template void ReaderFactory::emplaceReader<uint16_t>();
+template void ReaderFactory::emplaceReader<int16_t>();
+template void ReaderFactory::emplaceReader<uint32_t>();
+template void ReaderFactory::emplaceReader<int32_t>();
+template void ReaderFactory::emplaceReader<uint64_t>();
+template void ReaderFactory::emplaceReader<int64_t>();
+template void ReaderFactory::emplaceReader<float>();
+template void ReaderFactory::emplaceReader<double>();
