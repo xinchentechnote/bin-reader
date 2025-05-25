@@ -137,52 +137,57 @@ namespace UIComponents {
       size_t pos        = state.cursor_pos;
       auto   endian_str = state.is_little_endian ? "LE" : "BE";
 
-      return vbox({
-          hbox({
-              text("Endian:") | bold | color(Color::GrayDark),
+      // Populate data types with different sizes
+      std::vector<std::pair<std::string, std::string>> data_types;
+         auto populate = [&](const auto& label, auto type_tag) {
+        using T = decltype(type_tag);
+        try{
+          data_types.emplace_back(label, Utils::format_value(state.peek<T>(pos)));
+        } catch (const std::out_of_range& e) {
+          data_types.emplace_back(label, "N/A");
+        }
+      };
+      populate("u8", uint8_t{});
+      populate("u16", uint16_t{});
+      populate("u32", uint32_t{});
+      populate("u64", uint64_t{});  
+      populate("i8", int8_t{});
+      populate("i16", int16_t{});
+      populate("i32", int32_t{});
+      populate("i64", int64_t{});
+      populate("f32", float{});
+      populate("f64", double{});
+
+      std::unordered_map<std::string, Color> type_colors = {
+            {"u8",  Color::Cyan},
+            {"u16", Color::Cyan},
+            {"u32", Color::Cyan},
+            {"u64", Color::Cyan},
+
+            {"i8",  Color::Yellow},
+            {"i16", Color::Yellow},
+            {"i32", Color::Yellow},
+            {"i64", Color::Yellow},
+
+            {"f32", Color::Magenta},
+            {"f64", Color::Magenta},
+        };
+
+      Elements data_lines;
+      data_lines.push_back(hbox({
+              text("Endian:") | bold | color(Color::Green),
               text(endian_str),
-          }),
-          hbox({
-              text(" i8: ") | color(Color::Green) | flex_shrink,
-              text(Utils::format_value(state.peek<int8_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text(" u8: ") | color(Color::Cyan) | flex_shrink,
-              text(Utils::format_value(state.peek<uint8_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("i16: ") | color(Color::Yellow) | flex_shrink,
-              text(Utils::format_value(state.peek<int16_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("u16: ") | color(Color::Magenta) | flex_shrink,
-              text(Utils::format_value(state.peek<uint16_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("i32: ") | color(Color::Red) | flex_shrink,
-              text(Utils::format_value(state.peek<int32_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("u32: ") | color(Color::Blue) | flex_shrink,
-              text(Utils::format_value(state.peek<uint32_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("i64: ") | color(Color::Red) | flex_shrink,
-              text(Utils::format_value(state.peek<int64_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("u64: ") | color(Color::Blue) | flex_shrink,
-              text(Utils::format_value(state.peek<uint64_t>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("f32: ") | color(Color::White) | flex_shrink,
-              text(Utils::format_value(state.peek<float>(pos))) | flex_grow,
-          }),
-          hbox({
-              text("f64: ") | color(Color::White) | flex_shrink,
-              text(Utils::format_value(state.peek<double>(pos))) | flex_grow,
-          }),
-      }) | border | size(WIDTH, EQUAL, 30);
+          }));
+      for (const auto& [type, value] : data_types) {
+        Color c = type_colors.find(type) != type_colors.end() ? type_colors[type] : Color::White;
+        data_lines.push_back(
+            hbox({
+                text(fmt::format("{:>3}: ", type)) | color(c),
+                text(value) | flex_grow,
+            }));
+      }
+
+      return vbox(std::move(data_lines)) | border | size(WIDTH, EQUAL, 30);
     });
   }
 
