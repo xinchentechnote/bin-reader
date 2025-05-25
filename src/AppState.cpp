@@ -1,6 +1,6 @@
 #include "AppState.hpp"
 
-#include <fmt/format.h> 
+#include <fmt/format.h>
 #include <memory>
 
 // —— ReaderFactory 单例实现 —— //
@@ -10,7 +10,8 @@ const ReaderFactory &ReaderFactory::instance() {
 }
 
 ReaderFactory::ReaderFactory() {
-  // 把各种 TypedReader<T> 和 FixStringReader、LengthPrefixedStringReader 注册到 readers_ 中
+  // 把各种 TypedReader<T> 和 FixStringReader、LengthPrefixedStringReader 注册到
+  // readers_ 中
   emplaceReader<uint8_t>("u8");
   emplaceReader<int8_t>("i8");
   emplaceReader<uint16_t>("u16");
@@ -22,7 +23,7 @@ ReaderFactory::ReaderFactory() {
   emplaceReader<float>("f32");
   emplaceReader<double>("f64");
 
-  readers_.emplace("string", std::make_unique<FixStringReader>());
+  readers_.emplace("fixstring", std::make_unique<FixStringReader>());
   readers_.emplace("string@u8",
                    std::make_unique<LengthPrefixedStringReader<uint8_t>>());
   readers_.emplace("string@u16",
@@ -39,8 +40,11 @@ ReaderFactory::ReaderFactory() {
 
 bool ReaderFactory::read(AppState &state, const std::string &type) const {
   auto it = readers_.find(type);
+  if (Utils::is_char_array_type(type)) {
+    it = readers_.find("fixstring");
+  }
   if (it != readers_.end()) {
-    return it->second->read(state);
+    return it->second->read(state, type);
   }
   return false;
 }

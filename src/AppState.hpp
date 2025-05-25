@@ -7,8 +7,8 @@
 #include <istream>
 #include <memory>
 #include <ostream>
-#include <stack>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -25,18 +25,18 @@ using namespace ftxui;
 // ========== Record ==========
 /// 记录一次读取操作：记录读取位置 + 读到的数据 + 类型名称
 struct Record {
-  size_t        index;                    // 读取起始位置
-  std::any      data;                     // 存储任何类型的数据
-  std::string   type_name = std::string(); // 类型名称
+  size_t index;                          // 读取起始位置
+  std::any data;                         // 存储任何类型的数据
+  std::string type_name = std::string(); // 类型名称
 
   template <typename T>
-  Record(size_t idx, T value)
-      : index(idx), data(std::move(value)) {}
+  Record(size_t idx, T value) : index(idx), data(std::move(value)) {}
 
   /// 格式化成 “<8 位十六进制地址>:<类型名>:<数据>”
   std::string description() const {
     std::stringstream ss;
-    ss << std::hex << std::setw(8) << std::setfill('0') << index << ":" << type_name << ":";
+    ss << std::hex << std::setw(8) << std::setfill('0') << index << ":"
+       << type_name << ":";
     // 用户可以根据 type_name 再 any_cast 到相应类型并格式化输出
     return ss.str();
   }
@@ -45,23 +45,23 @@ struct Record {
 // ========== AppState ==========
 /// 保存整个程序的状态，以及各种读/写、光标移动逻辑
 struct AppState {
-  std::vector<uint8_t> data;        // 原始文件的二进制数据
-  size_t               cursor_pos   = 0;  // 当前光标位置（字节索引）
-  size_t               bytes_per_line = 16;  // 每行显示的字节数
-  size_t               current_page  = 0;    // 当前页号（从 0 开始）
-  size_t               hex_view_h    = 16;   // Hex 视图高度：每页最多显示 hex_view_h 行
-  std::string          status_msg;           // 状态栏文字
-  bool                 is_little_endian = true; // 默认小端序
-  std::stack<Record>   read_history;         // 保存所有已读取的记录以便 undo
+  std::vector<uint8_t> data;  // 原始文件的二进制数据
+  size_t cursor_pos = 0;      // 当前光标位置（字节索引）
+  size_t bytes_per_line = 16; // 每行显示的字节数
+  size_t current_page = 0;    // 当前页号（从 0 开始）
+  size_t hex_view_h = 16; // Hex 视图高度：每页最多显示 hex_view_h 行
+  std::string status_msg;          // 状态栏文字
+  bool is_little_endian = true;    // 默认小端序
+  std::stack<Record> read_history; // 保存所有已读取的记录以便 undo
 
-  std::string file_name;  // 当前打开的文件名
-  bool exit_requested = false;  // 是否请求退出
+  std::string file_name;       // 当前打开的文件名
+  bool exit_requested = false; // 是否请求退出
 
   /// 从磁盘加载整个文件到 data 中，并初始化 cursor/page
   void load_file(const std::string &path) {
     data = Utils::read_binary_file(path);
-    file_name   = std::filesystem::path(path).filename().string();
-    cursor_pos  = 0;
+    file_name = std::filesystem::path(path).filename().string();
+    cursor_pos = 0;
     current_page = 0;
   }
 
@@ -69,7 +69,8 @@ struct AppState {
   [[nodiscard]] size_t total_pages() const {
     if (data.empty())
       return 0;
-    const size_t total_lines = (data.size() + bytes_per_line - 1) / bytes_per_line;
+    const size_t total_lines =
+        (data.size() + bytes_per_line - 1) / bytes_per_line;
     const size_t lines_per_page = std::max<size_t>(1, hex_view_h);
     return (total_lines + lines_per_page - 1) / lines_per_page;
   }
@@ -77,8 +78,7 @@ struct AppState {
   // —— 通用读取/移动 接口 —— //
 
   /// 〈peek〉：在 pos 处“窥视”一个 T 类型的数据，但不移动光标
-  template <typename T>
-  T peek(size_t pos) const {
+  template <typename T> T peek(size_t pos) const {
     if (pos + sizeof(T) > data.size()) {
       throw std::out_of_range("Attempt to read beyond data bounds");
     }
@@ -90,9 +90,9 @@ struct AppState {
     return value;
   }
 
-  /// 〈read〉：从 cursor_pos 处读取一个 T 类型的数据，并记录到 history；光标向前移动 sizeof(T) 字节
-  template <typename T>
-  T read(size_t pos) {
+  /// 〈read〉：从 cursor_pos 处读取一个 T 类型的数据，并记录到
+  /// history；光标向前移动 sizeof(T) 字节
+  template <typename T> T read(size_t pos) {
     T value = peek<T>(pos);
     read_history.push(Record{pos, value});
     move(sizeof(T));
@@ -110,20 +110,22 @@ struct AppState {
     return str;
   }
 
-  /// 从 pos 处读取“长度前缀字符串”：先读一个 LengthType 长度，然后再读对应字节数的字符串
+  /// 从 pos 处读取“长度前缀字符串”：先读一个 LengthType
+  /// 长度，然后再读对应字节数的字符串
   template <typename LengthType>
   std::string read_length_prefixed_string(size_t pos) {
     const size_t start_pos = cursor_pos;
     try {
-      LengthType len = read<LengthType>(pos);  // 已经把 cursor_pos += sizeof(LengthType)
+      LengthType len =
+          read<LengthType>(pos); // 已经把 cursor_pos += sizeof(LengthType)
       std::string str = read_fixed_string(pos + sizeof(LengthType), len);
       // 因为我们想把“长度前缀”和“字符串”当作一个整体记录，所以先弹出它们，再合并成一个
-      read_history.pop();  // 弹出固定字符串那条
-      read_history.pop();  // 弹出长度前缀那条
+      read_history.pop(); // 弹出固定字符串那条
+      read_history.pop(); // 弹出长度前缀那条
       read_history.push(Record{start_pos, str});
       return str;
     } catch (...) {
-      cursor_pos = start_pos;  // 恢复光标
+      cursor_pos = start_pos; // 恢复光标
       throw;
     }
   }
@@ -249,23 +251,20 @@ private:
 class ReaderStrategy {
 public:
   virtual ~ReaderStrategy() = default;
-  virtual bool read(AppState &state) const = 0;
+  virtual bool read(AppState &state, std::string type) const = 0;
 };
 
 // ========== TypedReader<T> ==========
 /// 根据 T 类型来读取一个值，并把读取信息写进 status_msg
-template <typename T>
-class TypedReader : public ReaderStrategy {
+template <typename T> class TypedReader : public ReaderStrategy {
 public:
   explicit TypedReader(std::string typeName) : typeName_(std::move(typeName)) {}
 
-  bool read(AppState &state) const override {
+  bool read(AppState &state, std::string type) const override {
     const size_t orig_pos = state.cursor_pos;
     T value = state.read<T>(orig_pos);
     state.status_msg =
-        fmt::format("Read {}: {} @ 0x{:X}",
-                    typeName_,
-                    Utils::format_value(value),
+        fmt::format("Read {}: {} @ 0x{:X}", type, Utils::format_value(value),
                     static_cast<unsigned long long>(orig_pos));
     return true;
   }
@@ -278,18 +277,17 @@ private:
 /// 固定长度字符串读取，每次读取长度为 5
 class FixStringReader : public ReaderStrategy {
 public:
-  bool read(AppState &state) const override {
+  bool read(AppState &state, std::string type) const override {
     try {
       const size_t orig_pos = state.cursor_pos;
-      std::string value = state.read_fixed_string(orig_pos, 5);
+      size_t len = Utils::parse_char_length(type);
+      std::string value = state.read_fixed_string(orig_pos, len);
       state.status_msg =
-          fmt::format("Read char[{}]: {} @ 0x{:X}",
-                      5,
-                      Utils::format_value(value),
+          fmt::format("Read {}: {} @ 0x{:X}", type, Utils::format_value(value),
                       static_cast<unsigned long long>(orig_pos));
       return true;
     } catch (const std::exception &e) {
-      state.status_msg = fmt::format("String read failed: {}", e.what());
+      state.status_msg = fmt::format("{} read failed: {}", type, e.what());
       return false;
     }
   }
@@ -300,36 +298,36 @@ public:
 template <typename LengthType>
 class LengthPrefixedStringReader : public ReaderStrategy {
 public:
-  bool read(AppState &state) const override {
+  bool read(AppState &state, std::string type) const override {
     const size_t orig_pos = state.cursor_pos;
-    std::string value =
-        state.read_length_prefixed_string<LengthType>(orig_pos);
+    std::string value = state.read_length_prefixed_string<LengthType>(orig_pos);
     state.status_msg =
-        fmt::format("Read lpstring: {} @ 0x{:X}",
-                    Utils::format_value(value),
+        fmt::format("Read {}: {} @ 0x{:X}", type, Utils::format_value(value),
                     static_cast<unsigned long long>(orig_pos));
     return true;
   }
 };
 
 // ========== ReaderFactory ==========
-/// 单例工厂：根据字符串 key (“u8”、“i16”、“string”、“string@u8”等) 选出对应的 ReaderStrategy
+/// 单例工厂：根据字符串 key (“u8”、“i16”、“string”、“string@u8”等) 选出对应的
+/// ReaderStrategy
 class ReaderFactory {
 public:
   /// 拿到单例引用
   static const ReaderFactory &instance();
 
-  /// 通过 type 字符串去 readers_ map 中找，若存在则执行对应的 read() 并返回 true
+  /// 通过 type 字符串去 readers_ map 中找，若存在则执行对应的 read() 并返回
+  /// true
   bool read(AppState &state, const std::string &type) const;
 
 private:
-  ReaderFactory();  // 构造函数私有
+  ReaderFactory(); // 构造函数私有
   ReaderFactory(const ReaderFactory &) = delete;
   ReaderFactory &operator=(const ReaderFactory &) = delete;
 
-  template <typename T>
-  void emplaceReader(const std::string &typeName);
+  template <typename T> void emplaceReader(const std::string &typeName);
 
-  using StrategyMap = std::unordered_map<std::string, std::unique_ptr<ReaderStrategy>>;
+  using StrategyMap =
+      std::unordered_map<std::string, std::unique_ptr<ReaderStrategy>>;
   StrategyMap readers_;
 };

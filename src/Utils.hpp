@@ -94,4 +94,21 @@ inline std::vector<uint8_t> read_binary_file(const std::string &path) {
 
   return data;
 }
+
+inline bool is_char_array_type(const std::string &type) {
+  return type.size() > 6 && type.compare(0, 5, "char[") == 0 &&
+         type.back() == ']';
+}
+
+// 解析char[10]中的数字
+inline size_t parse_char_length(const std::string &type) {
+  size_t len = 0;
+  for (size_t i = 5; i < type.size() - 1; ++i) {
+    if (!std::isdigit(type[i])) {
+      throw std::invalid_argument("Non-digit in char[] length");
+    }
+    len = len * 10 + (type[i] - '0');
+  }
+  return len;
+}
 } // namespace Utils
