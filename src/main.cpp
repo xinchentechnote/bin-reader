@@ -6,25 +6,27 @@
 #include <vector>
 
 #include "AppState.hpp"
+#include "Command.hpp"
 #include "UIComponents.hpp"
 
 using namespace ftxui; // 统一使用命名空间
 
-int main(int argc, char** argv) {
-    try {
-        // Initialize application
-        const std::string file_path = Utils::ParseCommandLine(argc, argv);
-        auto screen = ScreenInteractive::Fullscreen();
-        AppState state;
-        // Load initial file
-        state.load_file(file_path);
-        // Setup and run UI
-        std::string cmd;
-        auto ui = UIComponents::MainUi(state, cmd, screen);
-        screen.Loop(ui);
-        return 0;
-    } catch (const std::exception& e) {
-        fmt::print(stderr, "Error: {}\n", e.what());
-        return 1;
-    }
+int main(int argc, char **argv) {
+  try {
+    // Initialize application
+    const std::string file_path = Utils::ParseCommandLine(argc, argv);
+    register_all_commands();
+    auto screen = ScreenInteractive::Fullscreen();
+    AppState state;
+    // Load initial file
+    state.load_file(file_path);
+    // Setup and run UI
+    std::string cmd;
+    auto ui = UIComponents::MainUi(state, cmd, screen);
+    screen.Loop(ui);
+    return 0;
+  } catch (const std::exception &e) {
+    fmt::print(stderr, "Error: {}\n", e.what());
+    return 1;
+  }
 }

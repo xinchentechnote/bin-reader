@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "CMake Build",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"detail": "Build the project using CMake"
+		},
+		{
+			"label": "CMake Configure (Debug)",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"-B",
+				"build",
+				"-DCMAKE_BUILD_TYPE=Debug",
+				"-DBUILD_TESTING=ON"
+			],
+			"problemMatcher": [],
+			"detail": "Run cmake to configure the project"
+		}
+	]
+}

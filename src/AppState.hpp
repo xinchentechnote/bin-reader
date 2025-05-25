@@ -55,6 +55,7 @@ struct AppState {
   std::stack<Record>   read_history;         // 保存所有已读取的记录以便 undo
 
   std::string file_name;  // 当前打开的文件名
+  bool exit_requested = false;  // 是否请求退出
 
   /// 从磁盘加载整个文件到 data 中，并初始化 cursor/page
   void load_file(const std::string &path) {

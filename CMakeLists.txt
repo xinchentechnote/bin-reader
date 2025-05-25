@@ -75,6 +75,7 @@ add_executable(bin-reader
   src/EventHandlers.cpp
   src/UIComponents.cpp
   src/AppState.cpp
+  src/Command.cpp
 )
 
 target_include_directories(bin-reader PRIVATE
@@ -101,6 +102,7 @@ if(BUILD_TESTING)
     src/EventHandlers.cpp
     src/UIComponents.cpp
     src/AppState.cpp
+    src/Command.cpp
   )
 
   target_include_directories(bin-reader-tests PRIVATE
