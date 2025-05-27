@@ -5,6 +5,23 @@
 #include <unordered_map>
 #include <vector>
 
+enum class CommandType {
+  None,
+  MoveUp,
+  MoveDown,
+  MoveLeft,
+  MoveRight,
+  PageUp,
+  PageDown,
+  ReadByte,
+  Jump,
+};
+
+struct Command {
+  CommandType type = CommandType::None;
+  // 可拓展参数
+};
+
 struct AppState;
 struct ParsedCommand;
 

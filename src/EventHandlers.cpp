@@ -13,23 +13,33 @@ namespace EventHandlers {
 EventHandlerFn HandleNavigation(AppState &state,
                                 ftxui::ScreenInteractive &screen) {
   return [&](const Event &event) {
+    Command cmd;
     if (event == ftxui::Event::PageUp)
-      return state.pre_page();
+      cmd.type = CommandType::PageUp;
     if (event == ftxui::Event::PageDown)
-      return state.next_page();
+      cmd.type = CommandType::PageDown;
     if (event == ftxui::Event::ArrowLeft)
-      return state.pre();
+      cmd.type = CommandType::MoveLeft;
     if (event == ftxui::Event::ArrowRight)
-      return state.next();
+      cmd.type = CommandType::MoveRight;
     if (event == ftxui::Event::ArrowUp)
-      return state.pre_line();
+      cmd.type = CommandType::MoveUp;
     if (event == ftxui::Event::ArrowDown)
-      return state.next_line();
+      cmd.type = CommandType::MoveDown;
+
+    if (event.character() == ".") {
+      state.apply_command(state.last_command);
+      return true;
+    }
+
     if (event == ftxui::Event::Escape) {
       screen.Exit();
       return true;
     }
-    return false;
+    // 记录并执行新命令
+    state.last_command = cmd;
+    state.apply_command(cmd);
+    return true;
   };
 }
 

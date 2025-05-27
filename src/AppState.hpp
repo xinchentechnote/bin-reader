@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "Command.hpp"
 #include "Utils.hpp"
 
 using namespace ftxui;
@@ -141,6 +142,7 @@ struct AppState {
   std::string status_msg;          // 状态栏文字
   bool is_little_endian = true;    // 默认小端序
   std::stack<Record> read_history; // 保存所有已读取的记录以便 undo
+  Command last_command;            // 最近一次执行的命令
 
   std::string file_name;       // 当前打开的文件名
   bool exit_requested = false; // 是否请求退出
@@ -161,6 +163,33 @@ struct AppState {
         (data.size() + bytes_per_line - 1) / bytes_per_line;
     const size_t lines_per_page = std::max<size_t>(1, hex_view_h);
     return (total_lines + lines_per_page - 1) / lines_per_page;
+  }
+
+  void apply_command(const Command &cmd) {
+    switch (cmd.type) {
+    case CommandType::MoveUp:
+      pre_line();
+      break;
+    case CommandType::MoveDown:
+      next_line();
+      break;
+    case CommandType::MoveLeft:
+      pre();
+      break;
+    case CommandType::MoveRight:
+      next();
+      break;
+    case CommandType::PageUp:
+      pre_page();
+      break;
+    case CommandType::PageDown:
+      next_page();
+      break;
+    case CommandType::ReadByte:
+    case CommandType::None:
+    case CommandType::Jump:
+      break;
+    }
   }
 
   // —— 通用读取/移动 接口 —— //
