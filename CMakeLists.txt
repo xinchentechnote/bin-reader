@@ -96,6 +96,7 @@ if(BUILD_TESTING)
 
   add_executable(bin-reader-tests
     tests/test_app_state.cpp
+    tests/test_command.cpp
     tests/test_events.cpp
     tests/test_integration.cpp
     tests/test_ui_components.cpp

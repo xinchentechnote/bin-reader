@@ -40,13 +40,19 @@ ReaderFactory::ReaderFactory() {
 
 bool ReaderFactory::read(AppState &state, const std::string &type) const {
   auto it = readers_.find(type);
-  if (Utils::is_char_array_type(type)) {
+  if (it == readers_.end() && Utils::is_char_array_type(type)) {
     it = readers_.find("fixstring");
   }
-  if (it != readers_.end()) {
-    return it->second->read(state, type);
+  if (it == readers_.end()) {
+    state.status_msg = fmt::format("Unknown type: {}", type);
+    return false;
   }
-  return false;
+  try {
+    return it->second->read(state, type);
+  } catch (const std::exception &e) {
+    state.status_msg = fmt::format("{} read failed: {}", type, e.what());
+    return false;
+  }
 }
 
 template <typename T> void ReaderFactory::emplaceReader() {

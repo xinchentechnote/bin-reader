@@ -13,20 +13,6 @@ namespace EventHandlers {
 EventHandlerFn HandleNavigation(AppState &state,
                                 ftxui::ScreenInteractive &screen) {
   return [&](const Event &event) {
-    Command cmd;
-    if (event == ftxui::Event::PageUp)
-      cmd.type = CommandType::PageUp;
-    if (event == ftxui::Event::PageDown)
-      cmd.type = CommandType::PageDown;
-    if (event == ftxui::Event::ArrowLeft)
-      cmd.type = CommandType::MoveLeft;
-    if (event == ftxui::Event::ArrowRight)
-      cmd.type = CommandType::MoveRight;
-    if (event == ftxui::Event::ArrowUp)
-      cmd.type = CommandType::MoveUp;
-    if (event == ftxui::Event::ArrowDown)
-      cmd.type = CommandType::MoveDown;
-
     if (event.character() == ".") {
       state.apply_command(state.last_command);
       return true;
@@ -36,7 +22,23 @@ EventHandlerFn HandleNavigation(AppState &state,
       screen.Exit();
       return true;
     }
-    // 记录并执行新命令
+
+    Command cmd;
+    if (event == ftxui::Event::PageUp)
+      cmd.type = CommandType::PageUp;
+    else if (event == ftxui::Event::PageDown)
+      cmd.type = CommandType::PageDown;
+    else if (event == ftxui::Event::ArrowLeft)
+      cmd.type = CommandType::MoveLeft;
+    else if (event == ftxui::Event::ArrowRight)
+      cmd.type = CommandType::MoveRight;
+    else if (event == ftxui::Event::ArrowUp)
+      cmd.type = CommandType::MoveUp;
+    else if (event == ftxui::Event::ArrowDown)
+      cmd.type = CommandType::MoveDown;
+    else
+      return false; // 不属于导航按键：交给命令行 Input 处理
+
     state.last_command = cmd;
     state.apply_command(cmd);
     return true;
@@ -48,10 +50,11 @@ EventHandlerFn HandleCommands(AppState &state, std::string &command_input,
   return [&](const Event &event) {
     if (event == Event::Return) {
       ParsedCommand cmd = ParsedCommand::parse(command_input);
-      bool handled = CommandRegistry::instance().dispatch(cmd, state);
-
-      if (!handled)
-        state.status_msg = "Unknown command: " + cmd.name;
+      if (!cmd.name.empty()) {
+        bool handled = CommandRegistry::instance().dispatch(cmd, state);
+        if (!handled)
+          state.status_msg = "Unknown command: " + cmd.name;
+      }
 
       if (state.exit_requested)
         screen.Exit();

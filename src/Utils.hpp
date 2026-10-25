@@ -1,7 +1,13 @@
 #pragma once
+#include <cctype>
+#include <cstdint>
+#include <cstdlib>
 #include <fmt/format.h>
 #include <fstream>
 #include <iterator>
+#include <limits>
+#include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -25,17 +31,11 @@ inline std::string ParseCommandLine(int argc, char **argv) {
   return file_path;
 }
 
-// 数值格式化模板函数
+// 数值格式化模板函数：浮点数保留 3 位小数，其余按十进制输出
 template <typename T> inline std::string format_value(T value) {
   if constexpr (std::is_floating_point_v<T>) {
-    // 浮点数保留3位小数
     return fmt::format("{:.3f}", value);
-  } else if constexpr (std::is_signed_v<T>) {
-    // 有符号整数显示十进制和十六进制
-    return fmt::format("{}",
-                       value); // 按字节数确定十六进制位数
   } else {
-    // 无符号整数显示十进制和十六进制
     return fmt::format("{}", value);
   }
 }
@@ -100,14 +100,17 @@ inline bool is_char_array_type(const std::string &type) {
          type.back() == ']';
 }
 
-// 解析char[10]中的数字
+// 解析 char[10] 中的数字，拒绝非数字字符并防止十进制累加溢出
 inline size_t parse_char_length(const std::string &type) {
   size_t len = 0;
-  for (size_t i = 5; i < type.size() - 1; ++i) {
-    if (!std::isdigit(type[i])) {
+  for (size_t i = 5; i + 1 < type.size(); ++i) {
+    if (!std::isdigit(static_cast<unsigned char>(type[i]))) {
       throw std::invalid_argument("Non-digit in char[] length");
     }
-    len = len * 10 + (type[i] - '0');
+    if (len > (std::numeric_limits<size_t>::max() - 9) / 10) {
+      throw std::out_of_range("char[] length overflow");
+    }
+    len = len * 10 + static_cast<size_t>(type[i] - '0');
   }
   return len;
 }

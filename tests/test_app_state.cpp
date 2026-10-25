@@ -16,7 +16,7 @@ TEST(AppStateTest, PeekAndRead_uint16) {
   EXPECT_THROW(state.peek<uint32_t>(2), std::out_of_range);
 
   // read<uint16_t>，并验证 cursor_pos、read_history
-  uint16_t readVal = state.read<uint16_t>(0);
+  uint16_t readVal = state.read<uint16_t>();
   EXPECT_EQ(readVal, 0x2211);
   EXPECT_EQ(state.cursor_pos, sizeof(uint16_t));
   // read_history 应该有 1 条记录，记录 index=0，data=0x2211
@@ -28,7 +28,7 @@ TEST(AppStateTest, PeekAndRead_uint16) {
   }
 
   // 再次 read，cursor 在 2 位置
-  uint16_t read2 = state.read<uint16_t>(state.cursor_pos);
+  uint16_t read2 = state.read<uint16_t>();
   EXPECT_EQ(read2, 0x4433); // 原数组 {0x33,0x44}
   EXPECT_EQ(state.cursor_pos, 4u);
   EXPECT_EQ(state.get_read_history().size(), 2u);
@@ -38,8 +38,8 @@ TEST(AppStateTest, ReadFixedStringAndUndo) {
   AppState state;
   state.data = {'H', 'e', 'l', 'l', 'o', 'X'};
 
-  // read_fixed_string(0,5)
-  std::string str = state.read_fixed_string(0, 5);
+  // read_fixed_string(5)：从当前光标读取 5 字节
+  std::string str = state.read_fixed_string(5);
   EXPECT_EQ(str, "Hello");
   EXPECT_EQ(state.cursor_pos, 5u);
   // read_history 只有一条，index=0，data="Hello"
@@ -55,8 +55,8 @@ TEST(AppStateTest, ReadFixedStringAndUndo) {
   EXPECT_EQ(state.cursor_pos, 0u);
   EXPECT_TRUE(state.get_read_history().empty());
 
-  // 越界测试
-  EXPECT_THROW(state.read_fixed_string(2, 10), std::out_of_range);
+  // 越界测试：从光标 0 处请求 10 字节，但只有 6 字节
+  EXPECT_THROW(state.read_fixed_string(10), std::out_of_range);
 }
 
 TEST(AppStateTest, ReadLengthPrefixedString) {
@@ -67,7 +67,7 @@ TEST(AppStateTest, ReadLengthPrefixedString) {
   state.cursor_pos = 0;
 
   // 读 u8 前缀 + 固定字符串
-  std::string lp = state.read_length_prefixed_string<uint8_t>(0);
+  std::string lp = state.read_length_prefixed_string<uint8_t>();
   EXPECT_EQ(lp, "ABC");
   // cursor_pos 前进 1+3=4
   EXPECT_EQ(state.cursor_pos, 4u);
@@ -80,13 +80,14 @@ TEST(AppStateTest, ReadLengthPrefixedString) {
     EXPECT_EQ(std::any_cast<std::string>(hist[0].data), "ABC");
   }
 
-  // 越界恢复测试：前缀值超过剩余字节长度
-  state.data = {0x05, 'A', 'B'}; // len=5，但剩余只有 2 字节
-  state.cursor_pos = 0;
-  EXPECT_THROW(state.read_length_prefixed_string<uint8_t>(0),
+  // 越界恢复测试：前缀值超过剩余字节长度（用全新状态，便于断言零副作用）
+  AppState failing;
+  failing.data = {0x05, 'A', 'B'}; // len=5，但剩余只有 2 字节
+  EXPECT_THROW(failing.read_length_prefixed_string<uint8_t>(),
                std::out_of_range);
-  // 异常后 cursor_pos 应恢复到 start_pos（0）
-  EXPECT_EQ(state.cursor_pos, 0u);
+  // 失败必须是无副作用的：光标与历史都不应被污染
+  EXPECT_EQ(failing.cursor_pos, 0u);
+  EXPECT_TRUE(failing.get_read_history().empty());
 }
 
 TEST(AppStateTest, CursorMovementAndPages) {
@@ -162,6 +163,77 @@ TEST(AppStateTest, SetCursorPosBoundaries) {
   EXPECT_EQ(state.cursor_pos, 8u);
   EXPECT_TRUE(state.set_cursor_pos(9));
   EXPECT_EQ(state.cursor_pos, 9u); // 保持不变
+  // data.size() 是合法的“文件末尾”哨兵位置，再往前一格非法
+  EXPECT_TRUE(state.set_cursor_pos(10));
+  EXPECT_FALSE(state.set_cursor_pos(11));
+}
+
+// move() 支持负偏移，并且允许落点正好是 0
+TEST(AppStateTest, MoveBackwardsToStart) {
+  AppState state;
+  state.data.resize(100, 0x00);
+  state.cursor_pos = 10;
+
+  EXPECT_TRUE(state.move(-3));
+  EXPECT_EQ(state.cursor_pos, 7u);
+
+  EXPECT_TRUE(state.move(-7));
+  EXPECT_EQ(state.cursor_pos, 0u);
+
+  EXPECT_FALSE(state.move(-1));
+  EXPECT_EQ(state.cursor_pos, 0u);
+
+  EXPECT_FALSE(state.move(1000));
+  EXPECT_EQ(state.cursor_pos, 0u);
+}
+
+// 历史以 vector 保存：读取顺序即容器顺序，undo 弹出末条
+TEST(AppStateTest, ReadHistoryKeepsInsertionOrder) {
+  AppState state;
+  state.data = {0x01, 0x00, 0x02, 0x00, 0x03, 0x00};
+
+  state.read<uint16_t>();
+  state.read<uint16_t>();
+  state.read<uint16_t>();
+
+  const auto &hist = state.get_read_history();
+  ASSERT_EQ(hist.size(), 3u);
+  EXPECT_EQ(hist[0].index, 0u);
+  EXPECT_EQ(hist[1].index, 2u);
+  EXPECT_EQ(hist[2].index, 4u);
+  EXPECT_EQ(std::any_cast<uint16_t>(hist[2].data), (uint16_t)3);
+
+  EXPECT_TRUE(state.undo());
+  EXPECT_EQ(state.get_read_history().size(), 2u);
+  EXPECT_EQ(state.cursor_pos, 4u);
+  EXPECT_TRUE(state.undo());
+  EXPECT_EQ(state.cursor_pos, 2u);
+  EXPECT_TRUE(state.undo());
+  EXPECT_TRUE(state.get_read_history().empty());
+  EXPECT_FALSE(state.undo()); // 空历史时撤销返回 false
+}
+
+// 读取失败不得留下任何副作用（历史上曾残留长度前缀记录）
+TEST(AppStateTest, FailedReadsLeaveNoTrace) {
+  {
+    AppState state;
+    state.data = {0x01, 0x02};
+    state.cursor_pos = 1; // 只剩 1 字节，读 u16 会越界
+    EXPECT_THROW(state.read<uint16_t>(), std::out_of_range);
+    EXPECT_TRUE(state.get_read_history().empty());
+    EXPECT_EQ(state.cursor_pos, 1u);
+  }
+  {
+    AppState state;
+    state.data.resize(200, 0x00);
+    state.cursor_pos = 0;
+    // 长度前缀巨大：不得因 size_t 回绕而“成功”读取
+    state.data[0] = 0xFF;
+    state.data[1] = 0xFF; // u16 len = 65535 > 剩余 198 字节
+    EXPECT_THROW(state.read_length_prefixed_string<uint16_t>(),
+                 std::out_of_range);
+    EXPECT_TRUE(state.get_read_history().empty());
+  }
 }
 
 // --------- ReaderFactory & ReaderStrategy 测试 ---------
@@ -266,15 +338,26 @@ TEST(ReaderFactoryTest, LengthPrefixedStringReaders) {
       EXPECT_NE(msg.find("@ 0x0"), std::string::npos);
     }
   }
-  // 3) string@i8 越界测试
+  // 3) string@i8 越界：不再向外抛异常，而是返回 false + 明确提示
   {
     AppState state;
     state.data = {0x05, 'A', 'B'}; // 长度 5，但只有 2 字节
     state.cursor_pos = 0;
-    EXPECT_THROW(ReaderFactory::instance().read(state, "string@i8"),
-                 std::out_of_range);
-    // cursor_pos 应恢复到 0
+    bool ok = ReaderFactory::instance().read(state, "string@i8");
+    EXPECT_FALSE(ok);
     EXPECT_EQ(state.cursor_pos, 0u);
+    EXPECT_TRUE(state.get_read_history().empty());
+    EXPECT_NE(state.status_msg.find("read failed"), std::string::npos);
+  }
+  // 4) string@i8 负长度前缀
+  {
+    AppState state;
+    state.data = {0xFF, 'A', 'B'}; // (int8_t)0xFF == -1
+    state.cursor_pos = 0;
+    EXPECT_FALSE(ReaderFactory::instance().read(state, "string@i8"));
+    EXPECT_EQ(state.cursor_pos, 0u);
+    EXPECT_NE(state.status_msg.find("Negative string length prefix"),
+              std::string::npos);
   }
 }
 
@@ -282,11 +365,12 @@ TEST(ReaderFactoryTest, UnknownType) {
   AppState state;
   state.data = {0x00, 0x00, 0x00, 0x00};
   state.cursor_pos = 0;
-  // 调用一个不存在的类型，应返回 false，不修改状态
+  // 不存在的类型：返回 false，状态栏必须给出可诊断的提示
   bool ok = ReaderFactory::instance().read(state, "not_exist");
   EXPECT_FALSE(ok);
   EXPECT_EQ(state.cursor_pos, 0u);
-  EXPECT_TRUE(state.status_msg.empty());
+  EXPECT_NE(state.status_msg.find("Unknown type: not_exist"),
+            std::string::npos);
 }
 
 // --------- Record.description() 测试 ---------

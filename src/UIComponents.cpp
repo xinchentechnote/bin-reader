@@ -44,18 +44,9 @@ Component MainUi(AppState &state, std::string &cmd, ScreenInteractive &screen) {
                 }) |
                 flex;
 
-  // Send an initial focus event so the command line gets focus on startup
-  screen.PostEvent(Event::Custom);
-
-  // Wrap with an event catcher to handle custom events, commands, and
+  // Wrap with an event catcher to handle custom events, commands and
   // navigation
-  return CatchEvent(layout, [&](const Event &event) {
-    // On the first Custom event, set focus to the command line
-    if (event == Event::Custom) {
-      command_line->TakeFocus();
-      return true;
-    }
-
+  auto ui = CatchEvent(layout, [&](const Event &event) {
     // Handle user-entered commands
     if (EventHandlers::HandleCommands(state, cmd, screen)(event)) {
       return true;
@@ -64,6 +55,12 @@ Component MainUi(AppState &state, std::string &cmd, ScreenInteractive &screen) {
     // Fallback to navigation (arrow keys, page up/down, etc.)
     return EventHandlers::HandleNavigation(state, screen)(event);
   });
+
+  // 必须同步取焦点：ScreenInteractive 尚未激活时 PostEvent/Post 会被直接丢弃，
+  // 而容器的默认焦点在第 0 个子节点（status_bar）上，命令行将收不到任何按键。
+  command_line->TakeFocus();
+
+  return ui;
 }
 
 Component HexView(AppState &state) {
@@ -163,7 +160,7 @@ Component DataPreviewBar(AppState &state) {
     populate<float>(data_types, state, pos);
     populate<double>(data_types, state, pos);
 
-    std::unordered_map<std::string, Color> type_colors = {
+    static const std::unordered_map<std::string, Color> type_colors = {
         {"u8", Color::Cyan},     {"u16", Color::Cyan},
         {"u32", Color::Cyan},    {"u64", Color::Cyan},
 
@@ -179,8 +176,9 @@ Component DataPreviewBar(AppState &state) {
         text(endian_str),
     }));
     for (const auto &[type, value] : data_types) {
-      Color c = type_colors.find(type) != type_colors.end() ? type_colors[type]
-                                                            : Color::White;
+      auto color_it = type_colors.find(type);
+      const Color c =
+          color_it != type_colors.end() ? color_it->second : Color::White;
       data_lines.push_back(hbox({
           text(fmt::format("{:>3}: ", type)) | color(c),
           text(value) | flex_grow,
@@ -193,8 +191,8 @@ Component DataPreviewBar(AppState &state) {
 
 Component DataReadHistoryBar(AppState &state) {
   return Renderer([&] {
-    // Get the history of read operations
-    std::vector<Record> records = state.get_read_history();
+    // 直接引用历史，避免每帧做一次全量拷贝
+    const std::vector<Record> &records = state.get_read_history();
     Elements history_lines;
 
     for (const auto &record : records) {
@@ -216,7 +214,7 @@ Component DataReadHistoryBar(AppState &state) {
 Component CommandLine(AppState & /*_state*/, std::string &command_input) {
   // Configure Input options
   ftxui::InputOption options;
-  options.placeholder = "Command (set be/le/pos <num>)";
+  options.placeholder = "r <type> | j <addr> | . | u | be/le | q";
   options.password = false;
   options.multiline = false;
   options.transform = [](ftxui::InputState state) {

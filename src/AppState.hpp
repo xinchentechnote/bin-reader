@@ -2,17 +2,14 @@
 
 #include <any>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fmt/format.h>
-#include <ftxui/component/component.hpp>
-#include <ftxui/component/screen_interactive.hpp>
-#include <ftxui/dom/elements.hpp>
 #include <iomanip>
-#include <istream>
 #include <memory>
 #include <ostream>
 #include <sstream>
-#include <stack>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeindex>
@@ -21,8 +18,6 @@
 
 #include "Command.hpp"
 #include "Utils.hpp"
-
-using namespace ftxui;
 
 template <typename T> struct TypeTraits {
   static constexpr const char *name = "unknown";
@@ -141,8 +136,8 @@ struct AppState {
   size_t hex_view_h = 16; // Hex 视图高度：每页最多显示 hex_view_h 行
   std::string status_msg;          // 状态栏文字
   bool is_little_endian = true;    // 默认小端序
-  std::stack<Record> read_history; // 保存所有已读取的记录以便 undo
-  Command last_command;            // 最近一次执行的命令
+  std::vector<Record> read_history; // 已读取的记录，按读取顺序排列，供 undo 与历史面板使用
+  Command last_command;            // 最近一次执行的导航命令
 
   std::string file_name;       // 当前打开的文件名
   bool exit_requested = false; // 是否请求退出
@@ -194,9 +189,9 @@ struct AppState {
 
   // —— 通用读取/移动 接口 —— //
 
-  /// 〈peek〉：在 pos 处“窥视”一个 T 类型的数据，但不移动光标
+  /// 〈peek〉：在 pos 处“窥视”一个 T 类型的数据，但不移动光标、不写历史
   template <typename T> T peek(size_t pos) const {
-    if (pos + sizeof(T) > data.size()) {
+    if (pos > data.size() || sizeof(T) > data.size() - pos) {
       throw std::out_of_range("Attempt to read beyond data bounds");
     }
     T value;
@@ -207,63 +202,68 @@ struct AppState {
     return value;
   }
 
-  /// 〈read〉：从 cursor_pos 处读取一个 T 类型的数据，并记录到
-  /// history；光标向前移动 sizeof(T) 字节
-  template <typename T> T read(size_t pos) {
+  /// 〈read〉：从当前光标处读取一个 T 类型的数据，写入历史并前移光标
+  template <typename T> T read() {
+    const size_t pos = cursor_pos;
     T value = peek<T>(pos);
-    auto record = Record{pos, value};
-    record.type_name = fmt::format("{}", TypeFactory::getTypeShortName<T>());
-    read_history.push(record);
-    move(sizeof(T));
+    Record record{pos, value};
+    record.type_name = TypeFactory::getTypeShortName<T>();
+    read_history.push_back(std::move(record));
+    move(static_cast<long long>(sizeof(T)));
     return value;
   }
 
-  /// 从 pos 处读取固定长度字符串（长度为 n），并推入 history；光标向前移动 n
-  std::string read_fixed_string(size_t pos, size_t n) {
-    if (pos + n > data.size()) {
+  /// 从当前光标处读取长度为 n 的定长字符串，写入历史并前移光标
+  std::string read_fixed_string(size_t n) {
+    const size_t pos = cursor_pos;
+    if (pos > data.size() || n > data.size() - pos) {
       throw std::out_of_range("Read operation exceeds data size");
     }
-    std::string str(data.begin() + pos, data.begin() + pos + n);
-    move(n);
-    auto record = Record{pos, str};
+    std::string str(data.begin() + static_cast<long>(pos),
+                    data.begin() + static_cast<long>(pos + n));
+    Record record{pos, str};
     record.type_name = fmt::format("char[{}]", n);
-    read_history.push(record);
+    read_history.push_back(std::move(record));
+    move(static_cast<long long>(n));
     return str;
   }
 
-  /// 从 pos 处读取“长度前缀字符串”：先读一个 LengthType
-  /// 长度，然后再读对应字节数的字符串
-  template <typename LengthType>
-  std::string read_length_prefixed_string(size_t pos) {
-    const size_t start_pos = cursor_pos;
-    try {
-      LengthType len =
-          read<LengthType>(pos); // 已经把 cursor_pos += sizeof(LengthType)
-      std::string str = read_fixed_string(pos + sizeof(LengthType), len);
-      // 因为我们想把“长度前缀”和“字符串”当作一个整体记录，所以先弹出它们，再合并成一个
-      read_history.pop(); // 弹出固定字符串那条
-      read_history.pop(); // 弹出长度前缀那条
-      auto record = Record{start_pos, str};
-      record.type_name =
-          fmt::format("string@{}", TypeFactory::getTypeShortName<LengthType>());
-      read_history.push(record);
-      return str;
-    } catch (...) {
-      cursor_pos = start_pos; // 恢复光标
-      throw;
+  /// 从当前光标处读取“长度前缀字符串”：先窥视一个 LengthType 长度，再读取对应
+  /// 字节数的字符串。整条记录（前缀 + 内容）合并成一条历史，且失败时不留残留。
+  template <typename LengthType> std::string read_length_prefixed_string() {
+    const size_t pos = cursor_pos;
+    if constexpr (std::is_signed_v<LengthType>) {
+      if (peek<LengthType>(pos) < 0) {
+        throw std::out_of_range("Negative string length prefix");
+      }
     }
+    const size_t len = static_cast<size_t>(peek<LengthType>(pos));
+    if (len > data.size() - pos - sizeof(LengthType)) {
+      throw std::out_of_range("Length-prefixed string exceeds data size");
+    }
+    const size_t body = pos + sizeof(LengthType);
+    std::string str(data.begin() + static_cast<long>(body),
+                    data.begin() + static_cast<long>(body + len));
+    Record record{pos, str};
+    record.type_name =
+        fmt::format("string@{}", TypeFactory::getTypeShortName<LengthType>());
+    read_history.push_back(std::move(record));
+    move(static_cast<long long>(sizeof(LengthType) + len));
+    return str;
   }
 
-  /// 撤销最近一次读取：弹出 read_history，并把 cursor_pos 恢复到该记录的 index
-  void undo() {
-    if (!read_history.empty()) {
-      Record record = read_history.top();
-      set_cursor_pos(record.index);
-      read_history.pop();
+  /// 撤销最近一次读取：弹出历史末条，并把光标恢复到该记录的起始位置
+  bool undo() {
+    if (read_history.empty()) {
+      return false;
     }
+    const size_t target = read_history.back().index;
+    read_history.pop_back();
+    set_cursor_pos(target);
+    return true;
   }
 
-  /// 直接设置光标位置（如果 new_pos <= data.size()），并更新 current_page
+  /// 直接设置光标位置（0 <= new_pos <= data.size()），并更新 current_page
   bool set_cursor_pos(size_t new_pos) {
     if (new_pos <= data.size()) {
       cursor_pos = new_pos;
@@ -273,15 +273,13 @@ struct AppState {
     return false;
   }
 
-  /// 从当前位置向前/向后平移 offset 字节
-  bool move(size_t offset) {
-    size_t new_pos = cursor_pos + offset;
-    if (new_pos <= data.size() && new_pos > 0) {
-      cursor_pos = new_pos;
-      update_page();
-      return true;
+  /// 从当前光标处平移 delta 字节（可为负），目标越界则不做任何修改
+  bool move(long long delta) {
+    const long long target = static_cast<long long>(cursor_pos) + delta;
+    if (target < 0 || static_cast<size_t>(target) > data.size()) {
+      return false;
     }
-    return false;
+    return set_cursor_pos(static_cast<size_t>(target));
   }
 
   /// 光标前移 1 字节
@@ -350,16 +348,8 @@ struct AppState {
     return false;
   }
 
-  /// 将 read_history 中所有 Record 按照“最早→最晚”的顺序返回一个 vector
-  std::vector<Record> get_read_history() const {
-    std::vector<Record> history;
-    auto temp = read_history;
-    while (!temp.empty()) {
-      history.insert(history.begin(), temp.top());
-      temp.pop();
-    }
-    return history;
-  }
+  /// 历史记录的只读视图，按“最早→最晚”排列。渲染每帧都会调用，因此不做拷贝。
+  const std::vector<Record> &get_read_history() const { return read_history; }
 
 private:
   /// 将指针指向的 T 类型的“字节数组”做大小端颠倒
@@ -371,11 +361,12 @@ private:
 };
 
 // ========== ReaderStrategy 抽象基类 ==========
-/// 定义一个虚函数 `bool read(AppState&)`，由子类实现具体读取逻辑
+/// 定义一个虚函数 `bool read(AppState&)`，由子类实现具体读取逻辑。
+/// 子类可以直接抛出越界异常，由 ReaderFactory 统一转成状态栏提示。
 class ReaderStrategy {
 public:
   virtual ~ReaderStrategy() = default;
-  virtual bool read(AppState &state, std::string type) const = 0;
+  virtual bool read(AppState &state, const std::string &type) const = 0;
 };
 
 // ========== TypedReader<T> ==========
@@ -384,9 +375,9 @@ template <typename T> class TypedReader : public ReaderStrategy {
 public:
   explicit TypedReader(std::string typeName) : typeName_(std::move(typeName)) {}
 
-  bool read(AppState &state, std::string type) const override {
+  bool read(AppState &state, const std::string &type) const override {
     const size_t orig_pos = state.cursor_pos;
-    T value = state.read<T>(orig_pos);
+    T value = state.read<T>();
     state.status_msg =
         fmt::format("Read {}: {} @ 0x{:X}", type, Utils::format_value(value),
                     static_cast<unsigned long long>(orig_pos));
@@ -398,33 +389,28 @@ private:
 };
 
 // ========== FixStringReader ==========
-/// 固定长度字符串读取，每次读取长度为 5
+/// 固定长度字符串读取，长度取自类型串（如 char[10]）
 class FixStringReader : public ReaderStrategy {
 public:
-  bool read(AppState &state, std::string type) const override {
-    try {
-      const size_t orig_pos = state.cursor_pos;
-      size_t len = Utils::parse_char_length(type);
-      std::string value = state.read_fixed_string(orig_pos, len);
-      state.status_msg =
-          fmt::format("Read {}: {} @ 0x{:X}", type, Utils::format_value(value),
-                      static_cast<unsigned long long>(orig_pos));
-      return true;
-    } catch (const std::exception &e) {
-      state.status_msg = fmt::format("{} read failed: {}", type, e.what());
-      return false;
-    }
+  bool read(AppState &state, const std::string &type) const override {
+    const size_t orig_pos = state.cursor_pos;
+    const size_t len = Utils::parse_char_length(type);
+    std::string value = state.read_fixed_string(len);
+    state.status_msg =
+        fmt::format("Read {}: {} @ 0x{:X}", type, Utils::format_value(value),
+                    static_cast<unsigned long long>(orig_pos));
+    return true;
   }
 };
 
 // ========== LengthPrefixedStringReader<LengthType> ==========
-/// 读取“长度前缀字符串”——先用 LengthType 读取长度，再读取对应字节数的字符串
+/// 读取“长度前缀字符串”——先窥视 LengthType 长度，再读取对应字节数的字符串
 template <typename LengthType>
 class LengthPrefixedStringReader : public ReaderStrategy {
 public:
-  bool read(AppState &state, std::string type) const override {
+  bool read(AppState &state, const std::string &type) const override {
     const size_t orig_pos = state.cursor_pos;
-    std::string value = state.read_length_prefixed_string<LengthType>(orig_pos);
+    std::string value = state.read_length_prefixed_string<LengthType>();
     state.status_msg =
         fmt::format("Read {}: {} @ 0x{:X}", type, Utils::format_value(value),
                     static_cast<unsigned long long>(orig_pos));
